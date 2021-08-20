@@ -11,6 +11,12 @@ output:
       smooth_scroll: true
 ---
 
+# Intro
+
+This script is looking at the BLAST results (only reporting the top unique hit) of the first Trinity de novo assembled transcriptome I did, against the transcriptome of P chabaudi chabaudi AS from PlasmoDB v53. 
+
+The de novo assembly used the reads from the 24h SBP asexual blood cycle experiment, which took samples every 3h over an entire blood cycle.
+
 # Aims
 
 * Ascertain the level of counts / TPM that are detected by the Trinity de novo assembled transcriptome.
@@ -24,11 +30,6 @@ knitr::opts_chunk$set(echo = FALSE,
                       results = TRUE, 
                       message = FALSE, 
                       warning = FALSE)
-
-
-knitr::opts_knit$set(root.dir = "working/HPC/littlet/tl21-01_testingTrinityChab24h/rcode")
-#Note that the above doesn't give an error if the dir doesn't exist
-
 options(scipen = 999) # Means that numbers are displayed normally not as 1e6 (1000000)
 ```
 
