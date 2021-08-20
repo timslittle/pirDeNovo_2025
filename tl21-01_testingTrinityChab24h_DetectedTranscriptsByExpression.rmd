@@ -23,7 +23,7 @@ The de novo assembly used the reads from the 24h SBP asexual blood cycle experim
 
 ** e.g. What is the minimum expressed gene detected / What is the maximally expressed gene not detected.
 
-*Same as above but for the _pir_ genes.
+* Same as above but for the _pir_ genes.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, 
