@@ -105,20 +105,19 @@ blast <- read.table('../../blast/trinityDeNovo_PirTranscriptsPccAS_blastn.outfmt
 unique(blast$sseqid) %>% length
 ```
 
-# Top unique hits across the pir transcriptome.
+# Top unique hits across the transcriptome.
 
 ```{r top_uniq_hits}
-blast %>% 
+blast_topNumHits <- blast %>% 
   group_by(sseqid) %>% 
   summarise(num = n(),
             max_id = max(pident),
             min_id = min(pident)) %>% 
   arrange(desc(num))
+blast_topNumHits
 ```
 
-Two pirs clearly have the most number of transcript hits:
-* PCHAS_0301700.
-* PCHAS_0701400.
+The gene with the greatest number of hits is `r blast_topNumHits[1,1]` with a max percentage id of `r blast_topNumHits$max_id[1]`.
 
 # Number unique hits v counts/TPM
 
