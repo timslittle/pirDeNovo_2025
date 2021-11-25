@@ -13,13 +13,11 @@ output:
 
 # Intro
 
-This script is looking at the BLAST results of the Trinity _de novo_ assembled transcriptomes I did with all reads, and the one with the pir database filtered reads, against the pir transcripts of P chabaudi chabaudi AS from PlasmoDB v53. 
+This script is looks at the BLAST results of a Trinity _de novo_ assembled transcriptome. 
 
-The de novo assembly used the reads from the 24h SBP asexual blood cycle experiment, which took samples every 3h over an entire blood cycle.
+# What this report shows:
 
-# Aims
-
-* Ascertain the level of counts / TPM of pirs that are detected by the Trinity de novo assembled transcriptome.
+* The level of counts / TPM of pirs that are detected by the Trinity de novo assembled transcriptome.
 
 ** e.g. What is the minimum expressed gene detected / What is the maximally expressed gene not detected.
 
@@ -38,6 +36,7 @@ library('dplyr',
         lib.loc = "/camp/home/littlet/R/x86_64-pc-linux-gnu-library/4.0")
 library('stringr')
 library('purrr')
+library('IRanges')
 ```
 
 ```{r function_ordering}
@@ -85,12 +84,12 @@ sbp <- read.csv('tl19-07_twentyfour_tpm_samples.csv',
 # list.files('../blast', pattern = 'outfmt')
 
 outfmt6_headers <- 
-  'qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore' %>% 
+  'qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs qcovhsp slen nident' %>% 
   strsplit(split = ' ') %>% 
   unlist
 
-blast <- read.table('../../blast/trinityDeNovo_PirTranscriptsPccAS_blastn.outfmt6',
-                        col.names = outfmt6_headers) %>% 
+blast <- read.table('/camp/lab/langhornej/working/HPC/littlet/tl21-01_testingTrinityChab24h/blast_pirDatabase/Trinity/trinity_blast_211124/trinityDeNovo_PirTranscriptsPccAS_blastn.outfmt6',
+  col.names = outfmt6_headers) %>% 
   mutate(geneid = str_extract(sseqid, 
                               pattern = '(?<=gene=).+(?=___or)'),
          sseqid = unlist(
@@ -99,22 +98,48 @@ blast <- read.table('../../blast/trinityDeNovo_PirTranscriptsPccAS_blastn.outfmt
                              pattern = '(?<=gene=).+(?=___or)|(?<=gene_product=).+(?=___trans)'), 
              paste, 
              collapse = '_')
-         )
+         ),
+         scovhsp = round( (nident/slen * 100), digits = 2),
+         scovs = round(((abs(send - sstart) + 1)/slen *100), digits = 2),
+         evalue = format(evalue, scientific = TRUE)
   )
 
-unique(blast$sseqid) %>% length
+#sanity test
+# all(blast$scovs >= blast$scovhsp)
 ```
+
+# Coverage of the subject (known transcripts) and query (assembled de novo transcripts) sequences.
+
+For our purposes the subject coverage is probably most important.
+
+```{r}
+plot(blast$qcovhsp, blast$scovhsp, 
+     xlab = 'De novo transcript coverage',
+     ylab = 'Known transcript coverage')
+```
+
+
+Number of unique genes found by BLAST: `r unique(blast$sseqid) %>% length`.
 
 # Top unique hits across the transcriptome.
 
 ```{r top_uniq_hits}
-blast_topNumHits <- blast %>% 
-  group_by(sseqid) %>% 
-  summarise(num = n(),
-            max_id = max(pident),
-            min_id = min(pident)) %>% 
-  arrange(desc(num))
-blast_topNumHits
+(blast_topNumHits <- blast %>% 
+   group_by(sseqid) %>% 
+   summarise(
+     num = n(),
+     max_id = max(pident),
+     min_id = min(pident),
+     max_nident = max(nident),
+     min_nident = min(nident),
+     max_gap = max(gapopen),
+     min_gap = min(gapopen),
+     max_qcovh = max(qcovhsp),
+     min_qcovh = min(qcovhsp),
+     max_scovh = max(scovhsp),
+     min_scovh = min(scovhsp)
+   ) %>% 
+   arrange(desc(num)))
 ```
 
 The gene with the greatest number of hits is `r blast_topNumHits[1,1]` with a max percentage id of `r blast_topNumHits$max_id[1]`.
@@ -123,31 +148,90 @@ The gene with the greatest number of hits is `r blast_topNumHits[1,1]` with a ma
 
 ```{r uniq_hits_v_counts}
 num_uniq_hits <- blast %>% 
-  group_by(sseqid, geneid) %>% 
+  group_by(geneid) %>% 
   summarise(num = n()) %>% 
   arrange(geneid) %>% 
   filter(geneid %in% counts$Geneid)
+```
+
+
+```{r uniq_hits_v_counts}
 
 total_counts_ofBlast <- filter(counts, 
-       Geneid %in% num_uniq_hits$geneid) %>% 
+                               Geneid %in% pir.info$Gene.ID) %>% 
   rowwise() %>% 
-  mutate(total_counts = sum(c_across(matches('SBP')))) %>% 
-  select(c('Geneid','total_counts'))
+  mutate(geneid = Geneid,
+  total_counts = sum(c_across(matches('SBP')))) %>% 
+  select(c('geneid','total_counts'))
+
+#Missing pir genes set to zero 
+missing <- tibble(geneid = pir.info$Gene.ID[!pir.info$Gene.ID %in% num_uniq_hits$geneid],
+                  num = 0)
+
+num_uniq_hits <- rbind(num_uniq_hits,
+                       missing) %>% 
+  arrange(geneid)
 
 total_tpm_ofBlast <- filter(sbp, 
-       Geneid %in% num_uniq_hits$geneid) %>% 
+       Geneid %in% pir.info$Gene.ID) %>% 
+  arrange(Geneid) %>% 
   rowwise() %>% 
-  mutate(total_tpm = sum(c_across(matches('SBP')))) %>% 
-  select(c('Geneid','total_tpm'))
+  mutate(geneid = Geneid, 
+         total_tpm = sum(c_across(matches('SBP')))) %>% 
+  select(c('geneid','total_tpm'))
+
+# Combine the dfs
+
+gene_transcription_df <- merge(merge(num_uniq_hits, 
+                                     total_tpm_ofBlast),
+                               total_counts_ofBlast)
 
 #all(num_uniq_hits$geneid %in% total_counts_ofBlast$Geneid)
 
-plot(num_uniq_hits$num, total_counts_ofBlast$total_counts)
-# plot(num_uniq_hits$num, total_tpm_ofBlast$total_tpm)
+plot(log1p(gene_transcription_df$num), 
+     log1p(gene_transcription_df$total_counts),
+     xlab = 'Number of transcripts matching the gene',
+     ylab = 'log Total gene counts + 1',
+     xaxt = "n")
+axis(1, at = log1p(c(0, 1, 2, 3, 5, 20, 50, 100)), labels = c(0, 1, 2, 3, 5, 20, 50, 100))
+
+plot(log1p(gene_transcription_df$num), 
+     log1p(gene_transcription_df$total_tpm),
+     xlab = 'Number of transcripts matching the gene',
+     ylab = 'log Total gene tpm + 1',
+     xaxt = "n")
+axis(1, at = log1p(c(0, 1, 2, 3, 5, 20, 50, 100)), labels = c(0, 1, 2, 3, 5, 20, 50, 100))
 
 ```
+```{r cov_by_all_hits}
+# Percentage of the subject covered by all hits
+#  Need to make sure the order is always the same
 
-Neither of the two high hit pirs have many counts or high TPM values.
+blast_dir <- blast %>% 
+  mutate(direction = ifelse(sstart > send, '-', '+'),
+         sstart_dir = ifelse(sstart > send, send, sstart),
+         send_dir = ifelse(sstart > send, sstart, send))
+
+gene_cov_all_hits <- IRanges(blast_dir$sstart_dir, blast_dir$send_dir) %>% 
+  split(., blast_dir$geneid) %>% 
+  reduce() %>% 
+  width %>% 
+  sum %>% 
+  data.frame
+
+gene_cov_all_hits$length <- blast$slen[match(rownames(gene_cov_all_hits), 
+                                  blast$geneid)]
+gene_cov_all_hits$qcovall <- 100*gene_cov_all_hits$./gene_cov_all_hits$length
+gene_cov_all_hits$geneid <- rownames(gene_cov_all_hits)
+
+gene_cov_all_hits <- merge(merge(gene_cov_all_hits, 
+            total_tpm_ofBlast),
+      total_counts_ofBlast)
+
+plot(gene_cov_all_hits$qcovall, 
+     log1p(gene_cov_all_hits$total_tpm))
+
+```
 
 # Are the genes not found by Trinity detected with lower count values than those in the assembly?
 
@@ -181,41 +265,38 @@ boxplot(log1p(total_counts) ~ any_hits , data = total_counts_BlastHits)
 # boxplot(log1p(total_tpm) ~ any_hits , data = total_tpm_BlastHits)
 ```
 
-overall pretty much the same.
 
 ```{r wilcox_test}
 wilcox.test(total_counts$total_counts[total_tpm_BlastHits$any_hits == 'No'], 
             total_counts$total_counts[total_tpm_BlastHits$any_hits == 'Yes'])
 ```
 
-#What's the lowest count assembled gene and the highest count undetected gene?
+#What's the lowest count/tpm assembled gene and the highest count/tpm undetected gene?
 
 ```{r high_count_unassembled}
 total_counts_BlastHits %>% 
   group_by(any_hits) %>% 
+  filter(any_hits == 'No') %>% 
   dplyr::slice_max(total_counts, n = 5)
 
-# total_tpm_BlastHits %>% 
-#   group_by(any_hits) %>% 
-#   dplyr::slice_max(total_tpm, n = 5)
+total_tpm_BlastHits %>%
+  group_by(any_hits) %>%
+  filter(any_hits == 'No') %>% 
+  dplyr::slice_max(total_tpm, n = 5)
 ```
 
-The pir 'PCHAS_0800015' has the highest count number/TPM (>2700 TPM) but no hits.
 
 ```{r low_count_assembled}
 total_counts_BlastHits %>% 
   group_by(any_hits) %>% 
   dplyr::slice_min(total_counts, n = 5) %>% 
-  map_df(rev) #Turn df upside-down
+  filter(any_hits == 'Yes') 
 
 total_tpm_BlastHits %>% 
   group_by(any_hits) %>% 
   dplyr::slice_min(total_tpm, n = 5) %>% 
-  map_df(rev) #Turn df upside-down
+  filter(any_hits == 'Yes')
 ```
-
-PCHAS_1042700 is the lowest pir count to appear in the Trinity assembly BLAST.
-Rather sanely no zero count genes are found by Trinity, although I guess that zero count/TPM genes are unlikely when summing over so many samples.
 
 ```{r assemblies_of_low_counts}
 genes_low_count_assembled <- total_counts_BlastHits %>% 
@@ -227,10 +308,10 @@ genes_low_count_assembled <- total_counts_BlastHits %>%
 blast %>% 
   filter(str_detect(sseqid, 
                     pattern = paste(genes_low_count_assembled, 
-                                    collapse = '|')))
+                                    collapse = '|'))) %>% 
+  arrange(sseqid, evalue)
 ```
 
-And they're good assemblies!
 
 # The BLAST50 results
 
