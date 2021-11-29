@@ -49,6 +49,29 @@ ordering <- function(to_order, order_vector, fromLast = TRUE){
 }
 ```
 
+```{r function_plotRanges}
+#' Plot genomic ranges from the IRanges object or GRanges object.
+# from https://rdrr.io/github/JokingHero/rxtras/src/R/plot_wrappers.R
+
+plotRanges <- function(x, xlim = x, main = deparse(substitute(x)),  col = "black", sep = 0.5, ...){
+  if (!requireNamespace("IRanges", quietly = TRUE)) {
+    stop("IRanges needed for this function to work. Please install it.",
+         call. = FALSE)
+  }
+  height <- 1
+  if (is(xlim, "Ranges"))
+      xlim <- c(min(start(xlim)), max(end(xlim)))
+  bins <- disjointBins(IRanges(start(x), end(x) + 1))
+  plot.new()
+  plot.window(xlim, c(0, max(bins) * (height + sep)))
+  ybottom <- bins * (sep + height) - height
+  rect(start(x) - 0.5, ybottom, end(x) + 0.5, ybottom + height, col = col, ...)
+  title(main)
+  axis(1)
+}
+```
+
+
 ```{r load_data}
 pir.info <- read.delim('Pchabaudi_pir_info.txt', sep = '\t')
 
@@ -104,16 +127,62 @@ blast <- read.table('/camp/lab/langhornej/working/HPC/littlet/tl21-01_testingTri
          evalue = format(evalue, scientific = TRUE)
   )
 
+# Filter for the top hits for each de novo transcript by e-value.
+
+blast_top <- group_by(blast, qseqid) %>% 
+  slice_min(evalue, n = 1)
+
+#Filter for the de novo transcripts which only match a single pir.
+# Also removing idents below 100 because these are probably poor matches.
+
+blast_uniq <- blast %>% 
+  filter(nident > 100) %>% 
+  group_by(qseqid) %>% 
+  mutate(num = n_distinct(geneid)) %>% 
+  filter(num == 1)
+
 #sanity test
 # all(blast$scovs >= blast$scovhsp)
 ```
 
-# Coverage of the subject (known transcripts) and query (assembled de novo transcripts) sequences.
+# Number of hits for each de novo transcript with a BLAST hit.
+
+```{r number_of_hits_per_deNovoTranscript}
+blast %>% 
+  filter(nident > 0) %>% 
+  group_by(qseqid) %>% 
+  summarise(num = n_distinct(geneid)) %>% 
+  .$num %>% 
+  hist(main = 'Histogram of BLAST hits per de novo transcript (50 max)')
+```
+
+```{r number_of_uniq_transcripts_per_gene}
+blast %>% 
+  filter(nident > 0) %>% 
+  group_by(qseqid) %>% 
+  mutate(num = n_distinct(geneid)) %>% 
+  filter(num == 1) %>% 
+  group_by(geneid) %>% 
+  summarise(num_of_uniq_deNovoTranscripts = n_distinct(qseqid),
+            max_id = max(pident),
+            min_id = min(pident),
+            max_nident = max(nident),
+            min_nident = min(nident),
+            max_gap = max(gapopen),
+            min_gap = min(gapopen),
+            max_qcovh = max(qcovhsp),
+            min_qcovh = min(qcovhsp),
+            max_scovh = max(scovhsp),
+            min_scovh = min(scovhsp)) %>% 
+  arrange(desc(num_of_uniq_deNovoTranscripts))
+```
+
+# Coverage of the subject (known transcripts) and query (assembled de novo transcripts) sequences. (Using only the top hits for each de novo transcript)
 
 For our purposes the subject coverage is probably most important.
 
 ```{r}
-plot(blast$qcovhsp, blast$scovhsp, 
+plot(blast_top$qcovhsp, blast_top$scovhsp, 
      xlab = 'De novo transcript coverage',
      ylab = 'Known transcript coverage')
 ```
@@ -121,10 +190,10 @@ plot(blast$qcovhsp, blast$scovhsp,
 
 Number of unique genes found by BLAST: `r unique(blast$sseqid) %>% length`.
 
-# Top unique hits across the transcriptome.
+# Genes with the most top hits across the transcriptome.
 
 ```{r top_uniq_hits}
-(blast_topNumHits <- blast %>% 
+(blast_topNumHits <- blast_top %>% 
    group_by(sseqid) %>% 
    summarise(
      num = n(),
@@ -142,18 +211,26 @@ Number of unique genes found by BLAST: `r unique(blast$sseqid) %>% length`.
    arrange(desc(num)))
 ```
 
-The gene with the greatest number of hits is `r blast_topNumHits[1,1]` with a max percentage id of `r blast_topNumHits$max_id[1]`.
+The known transcript with the greatest number of hits is `r blast_topNumHits[1,1]` with a max percentage id of `r blast_topNumHits$max_id[1]`.
 
-# Number unique hits v counts/TPM
+# Known transcripts with >95% coverage from one transcript
+
+```{r transcripts_covering_most_of_known_transcripts}
+(blast %>% 
+   group_by(sseqid) %>% 
+   filter(scovhsp >= 95) %>% 
+   arrange(geneid) )
+```
+
+# Number of top hits v counts/TPM
 
 ```{r uniq_hits_v_counts}
-num_uniq_hits <- blast %>% 
+num_uniq_hits <- blast_top %>% 
   group_by(geneid) %>% 
   summarise(num = n()) %>% 
   arrange(geneid) %>% 
   filter(geneid %in% counts$Geneid)
 ```
-
 
 ```{r uniq_hits_v_counts}
 
@@ -190,24 +267,25 @@ gene_transcription_df <- merge(merge(num_uniq_hits,
 
 plot(log1p(gene_transcription_df$num), 
      log1p(gene_transcription_df$total_counts),
-     xlab = 'Number of transcripts matching the gene',
+     xlab = 'Number of de novo transcripts which BLAST to the known transcript best',
      ylab = 'log Total gene counts + 1',
      xaxt = "n")
 axis(1, at = log1p(c(0, 1, 2, 3, 5, 20, 50, 100)), labels = c(0, 1, 2, 3, 5, 20, 50, 100))
 
 plot(log1p(gene_transcription_df$num), 
      log1p(gene_transcription_df$total_tpm),
-     xlab = 'Number of transcripts matching the gene',
+     xlab = 'Number of de novo transcripts which BLAST to the known transcript best',
      ylab = 'log Total gene tpm + 1',
      xaxt = "n")
 axis(1, at = log1p(c(0, 1, 2, 3, 5, 20, 50, 100)), labels = c(0, 1, 2, 3, 5, 20, 50, 100))
 
 ```
 ```{r cov_by_all_hits}
-# Percentage of the subject covered by all hits
-#  Need to make sure the order is always the same
+# Percentage of the subject covered by all hits.
+#  Need to make sure the order is always the same.
+#  I think this coverage could still include gaps.
 
-blast_dir <- blast %>% 
+blast_dir <- blast_top %>% 
   mutate(direction = ifelse(sstart > send, '-', '+'),
          sstart_dir = ifelse(sstart > send, send, sstart),
          send_dir = ifelse(sstart > send, sstart, send))
@@ -225,18 +303,20 @@ gene_cov_all_hits$qcovall <- 100*gene_cov_all_hits$./gene_cov_all_hits$length
 gene_cov_all_hits$geneid <- rownames(gene_cov_all_hits)
 
 gene_cov_all_hits <- merge(merge(gene_cov_all_hits, 
-            total_tpm_ofBlast),
-      total_counts_ofBlast)
+                                 total_tpm_ofBlast),
+                           total_counts_ofBlast)
 
 plot(gene_cov_all_hits$qcovall, 
-     log1p(gene_cov_all_hits$total_tpm))
+     log1p(gene_cov_all_hits$total_tpm),
+     xlab = 'Total coverage of known transcript by all de novo transcripts',
+     ylab = 'total TPM')
 
 ```
 
 # Are the genes not found by Trinity detected with lower count values than those in the assembly?
 
 ```{r counts_of_hits_v_nohits}
-num_uniq_hits <- blast %>% 
+num_uniq_hits <- blast_top %>% 
   group_by(sseqid, geneid) %>% 
   summarise(num = n()) %>% 
   mutate(any_hits = ifelse(num >= 1, 'Yes', 'No')) %>% 
@@ -287,15 +367,25 @@ total_tpm_BlastHits %>%
 
 
 ```{r low_count_assembled}
-total_counts_BlastHits %>% 
+(low_count_hit <- total_counts_BlastHits %>% 
   group_by(any_hits) %>% 
   dplyr::slice_min(total_counts, n = 5) %>% 
-  filter(any_hits == 'Yes') 
+  filter(any_hits == 'Yes'))
 
-total_tpm_BlastHits %>% 
+IRanges(blast_dir$sstart_dir, blast_dir$send_dir) %>% 
+  split(., blast_dir$geneid) %>% 
+  `[[`(., paste(low_count_hit[1,1])) %>% 
+  plotRanges(main = paste(low_count_hit[1,1]))
+
+(low_tpm_hit <- total_tpm_BlastHits %>% 
   group_by(any_hits) %>% 
   dplyr::slice_min(total_tpm, n = 5) %>% 
-  filter(any_hits == 'Yes')
+  filter(any_hits == 'Yes'))
+
+IRanges(blast_dir$sstart_dir, blast_dir$send_dir) %>% 
+  split(., blast_dir$geneid) %>% 
+  `[[`(., paste(low_tpm_hit[1,1])) %>% 
+  plotRanges(main = paste(low_tpm_hit[1,1]))
 ```
 
 ```{r assemblies_of_low_counts}
@@ -313,53 +403,8 @@ blast %>%
 ```
 
 
-# The BLAST50 results
-
-From the results of BLAST in which max top 50 results were included.
-
-```{r blast50_data}
-blast50 <- read.table('../../blast/trinityDeNovo_PirTranscriptsPccAS_blastn-maxhits50.outfmt6',
-                        col.names = outfmt6_headers) %>% 
-  mutate(geneid = str_extract(sseqid, 
-                              pattern = '(?<=gene=).+(?=___or)'),
-         sseqid = unlist(
-           lapply(
-             str_extract_all(sseqid, 
-                             pattern = '(?<=gene=).+(?=___or)|(?<=gene_product=).+(?=___trans)'), 
-             paste, 
-             collapse = '_')
-         )
-  )
-```
-
-```{r num_hits_50}
-blast50 %>% 
-  group_by(sseqid) %>% 
-  summarise(num = n(),
-            max_id = max(pident),
-            min_id = min(pident)) %>% 
-  arrange(desc(num))
-```
-
-```{r num_hits_by_transcript}
-blast50 %>% 
-  group_by(qseqid) %>% 
-  summarise(num = n(),
-            num_pirs = length(unique(sseqid)),
-            lens = paste0(max(length), ', ', min(length)),
-            pident = paste0(max(pident),', ',min(pident)),
-            pirs = paste0(unique(
-              str_extract(sseqid, 
-                          pattern = 'PCHAS_.{7}')
-            ), 
-            collapse = ', ')) %>% 
-  arrange(desc(num))
-```
-
-A lot of transcripts map to many of the pirs, probably due to having highly similar sequence at points.
-
 ```{r pirs_with_uniq_transcript_matched}
-blast50 %>% 
+blast %>% 
   group_by(qseqid) %>% 
   mutate(num_pirs = ifelse(length(unique(sseqid)) == 1, 
                            'Uniq', 
@@ -375,4 +420,48 @@ blast50 %>%
   arrange(desc(uniq_trans), multi_trans)
 ```
 
-Most number of transcripts that only BLAST to a single pir gene is 4, and the three pirs with this property all have 9-18 other transcripts that BLAST to other pirs. 'PCHAS_0101200_PIR_protein' and 'PCHAS_0302700_PIR_protein' have 3 unique transcripts BLASTing to them which do not match any other pir. Interestingly enough this isn't the case for any other pir transcript.. 'PCHAS_0302700' has syntenic orthologs in vinckei and yoelii species.
+```{r possible_chimeric_recomb_sequences, eval = FALSE}
+
+genes_sharingfewertranscripts <- blast %>% 
+  filter(length >= 200) %>% 
+  group_by(qseqid) %>% 
+  mutate(num_genes_hit = n_distinct(sseqid)) %>% 
+  group_by(geneid) %>% 
+  mutate(num_withotherpirs = ifelse(num_genes_hit >= 2,
+                                     1,
+                                     0)) %>% 
+  distinct(qseqid, sseqid, .keep_all = TRUE) %>% 
+  summarise(sum_num_withotherpirs = sum(num_withotherpirs)) %>% 
+  arrange(desc(sum_num_withotherpirs)) %>% 
+  filter(sum_num_withotherpirs < 10) %>% 
+  .$geneid %>% 
+  sort
+
+#How many known transcripts hit a de novo transcript which also hits
+# other known transcripts (possible chimeras/recombinants, or a result of 
+# sequence similarity)? 
+
+# Note that the distinct() function, to remove duplicates of known transcripts which BLAST
+#   to the same gene multiple times, makes a big difference.
+
+blast %>% 
+  filter(length >= 200) %>%
+  group_by(qseqid) %>% 
+  mutate(num_genes_hit = n_distinct(sseqid)) %>% 
+  group_by(geneid) %>% 
+  mutate(num_withotherpirs = ifelse(num_genes_hit >= 2,
+                                     1,
+                                     0)) %>% 
+  distinct(qseqid, sseqid, .keep_all = TRUE) %>% 
+  summarise(sum_num_withotherpirs = sum(num_withotherpirs)) %>% 
+  .$sum_num_withotherpirs %>% 
+  hist(breaks = 20, xlab = 'Number of shared de novo transcripts')
+
+blast %>% 
+  filter(length >= 200,
+         geneid %in% genes_sharingfewertranscripts) %>% 
+  group_by(qseqid) %>% 
+  mutate(num_genes_hit = n_distinct(sseqid)) %>% 
+  arrange(desc(num_genes_hit), qseqid)
+```
+
