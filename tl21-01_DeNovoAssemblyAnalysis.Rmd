@@ -132,7 +132,7 @@ blast <- read.table('/camp/lab/langhornej/working/HPC/littlet/tl21-01_testingTri
 blast_top <- group_by(blast, qseqid) %>% 
   slice_min(evalue, n = 1)
 
-#Filter for the de novo transcripts which only match a single pir.
+#Filter for the de novo transcripts which only match a single known pir.
 # Also removing idents below 100 because these are probably poor matches.
 
 blast_uniq <- blast %>% 
@@ -153,7 +153,8 @@ blast %>%
   group_by(qseqid) %>% 
   summarise(num = n_distinct(geneid)) %>% 
   .$num %>% 
-  hist(main = 'Histogram of BLAST hits per de novo transcript (50 max)')
+  hist(main = 'Histogram of BLAST hits per de novo transcript (50 max)',
+       breaks = 50)
 ```
 
 ```{r number_of_uniq_transcripts_per_gene}
@@ -307,9 +308,9 @@ gene_cov_all_hits <- merge(merge(gene_cov_all_hits,
                            total_counts_ofBlast)
 
 plot(gene_cov_all_hits$qcovall, 
-     log1p(gene_cov_all_hits$total_tpm),
+     log1p(gene_cov_all_hits$total_counts),
      xlab = 'Total coverage of known transcript by all de novo transcripts',
-     ylab = 'total TPM')
+     ylab = 'log total counts + 1')
 
 ```
 
@@ -402,6 +403,7 @@ blast %>%
   arrange(sseqid, evalue)
 ```
 
+# Known transcripts with unique and multi-BLASTing de novo transcripts
 
 ```{r pirs_with_uniq_transcript_matched}
 blast %>% 
@@ -422,8 +424,10 @@ blast %>%
 
 ```{r possible_chimeric_recomb_sequences, eval = FALSE}
 
+length_filter <- 200
+
 genes_sharingfewertranscripts <- blast %>% 
-  filter(length >= 200) %>% 
+  filter(length >= length_filter) %>% 
   group_by(qseqid) %>% 
   mutate(num_genes_hit = n_distinct(sseqid)) %>% 
   group_by(geneid) %>% 
@@ -445,7 +449,7 @@ genes_sharingfewertranscripts <- blast %>%
 #   to the same gene multiple times, makes a big difference.
 
 blast %>% 
-  filter(length >= 200) %>%
+  filter(length >= length_filter) %>%
   group_by(qseqid) %>% 
   mutate(num_genes_hit = n_distinct(sseqid)) %>% 
   group_by(geneid) %>% 
@@ -458,7 +462,7 @@ blast %>%
   hist(breaks = 20, xlab = 'Number of shared de novo transcripts')
 
 blast %>% 
-  filter(length >= 200,
+  filter(length >= length_filter,
          geneid %in% genes_sharingfewertranscripts) %>% 
   group_by(qseqid) %>% 
   mutate(num_genes_hit = n_distinct(sseqid)) %>% 
