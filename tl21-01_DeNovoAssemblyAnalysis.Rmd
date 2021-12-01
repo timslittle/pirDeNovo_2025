@@ -9,6 +9,8 @@ output:
     toc_float:
       collapsed: false
       smooth_scroll: true
+params:
+  blast_output_file: '/camp/lab/langhornej/working/HPC/littlet/tl21-01_testingTrinityChab24h/blast_pirDatabase/Trinity/trinityAll_blast_211129/trinityDeNovo_PirTranscriptsPccAS_blastn.outfmt6'
 ---
 
 # Intro
@@ -37,6 +39,7 @@ library('dplyr',
 library('stringr')
 library('purrr')
 library('IRanges')
+library('kableExtra')
 ```
 
 ```{r function_ordering}
@@ -111,7 +114,7 @@ outfmt6_headers <-
   strsplit(split = ' ') %>% 
   unlist
 
-blast <- read.table('/camp/lab/langhornej/working/HPC/littlet/tl21-01_testingTrinityChab24h/blast_pirDatabase/Trinity/trinity_blast_211124/trinityDeNovo_PirTranscriptsPccAS_blastn.outfmt6',
+blast <- read.table(params$blast_output_file,
   col.names = outfmt6_headers) %>% 
   mutate(geneid = str_extract(sseqid, 
                               pattern = '(?<=gene=).+(?=___or)'),
@@ -175,7 +178,8 @@ blast %>%
             min_qcovh = min(qcovhsp),
             max_scovh = max(scovhsp),
             min_scovh = min(scovhsp)) %>% 
-  arrange(desc(num_of_uniq_deNovoTranscripts))
+  arrange(desc(num_of_uniq_deNovoTranscripts)) %>% 
+  kbl() %>% kable_styling() %>% scroll_box(width = "100%", height = "200px")
 ```
 
 # Coverage of the subject (known transcripts) and query (assembled de novo transcripts) sequences. (Using only the top hits for each de novo transcript)
@@ -194,7 +198,7 @@ Number of unique genes found by BLAST: `r unique(blast$sseqid) %>% length`.
 # Genes with the most top hits across the transcriptome.
 
 ```{r top_uniq_hits}
-(blast_topNumHits <- blast_top %>% 
+blast_topNumHits <- blast_top %>% 
    group_by(sseqid) %>% 
    summarise(
      num = n(),
@@ -209,7 +213,9 @@ Number of unique genes found by BLAST: `r unique(blast$sseqid) %>% length`.
      max_scovh = max(scovhsp),
      min_scovh = min(scovhsp)
    ) %>% 
-   arrange(desc(num)))
+   arrange(desc(num))
+blast_topNumHits %>% 
+  kbl() %>% kable_styling() %>% scroll_box(width = "100%", height = "200px")
 ```
 
 The known transcript with the greatest number of hits is `r blast_topNumHits[1,1]` with a max percentage id of `r blast_topNumHits$max_id[1]`.
@@ -217,11 +223,32 @@ The known transcript with the greatest number of hits is `r blast_topNumHits[1,1
 # Known transcripts with >95% coverage from one transcript
 
 ```{r transcripts_covering_most_of_known_transcripts}
-(blast %>% 
+transcripts_covered_by_denovo <- blast %>% 
    group_by(sseqid) %>% 
    filter(scovhsp >= 95) %>% 
-   arrange(geneid) )
+  arrange(geneid)
+transcripts_covered_by_denovo %>% 
+  kbl() %>% kable_styling() %>% scroll_box(width = "100%", height = "300px")
+
+transcripts_covered_by_denovo_diffcov <- lapply(seq(0,100,by = 5),
+                                                function(covrg) {
+                                                  blast %>% 
+                                                    group_by(sseqid) %>% 
+                                                    filter(scovhsp >= covrg) %>%
+                                                    .$geneid %>% unique %>% length
+                                                })
+plot(y = unlist(transcripts_covered_by_denovo_diffcov), 
+     x = seq(0,100,by = 5),
+     ylim = c(0,225),
+     ylab = 'Number of different genes covered by a single de novo transcript',
+     xlab = 'Percentage of coverage by individual transcripts',
+     yaxt = 'none')
+axis(2, at = seq(0,250,by = 25))
+abline(a = 25, b = 0)
+                                                    
 ```
+
+There are `r length(unique(transcripts_covered_by_denovo$geneid))` known transcripts covered by >=95% of at least one individual _de novo_ transcript.
 
 # Number of top hits v counts/TPM
 
@@ -233,7 +260,7 @@ num_uniq_hits <- blast_top %>%
   filter(geneid %in% counts$Geneid)
 ```
 
-```{r uniq_hits_v_counts}
+```{r uniq_hits_v_counts_plots}
 
 total_counts_ofBlast <- filter(counts, 
                                Geneid %in% pir.info$Gene.ID) %>% 
@@ -320,7 +347,7 @@ plot(gene_cov_all_hits$qcovall,
 num_uniq_hits <- blast_top %>% 
   group_by(sseqid, geneid) %>% 
   summarise(num = n()) %>% 
-  mutate(any_hits = ifelse(num >= 1, 'Yes', 'No')) %>% 
+  mutate(top_hits = ifelse(num >= 1, 'Yes', 'No')) %>% 
   arrange(geneid) %>% 
   filter(geneid %in% counts$Geneid)
 
@@ -331,7 +358,7 @@ total_counts <- counts %>%
   select(c('Geneid','total_counts'))
 
 total_counts_BlastHits <- mutate(total_counts,
-       any_hits = ifelse(Geneid %in% num_uniq_hits$geneid, 'Yes', 'No'))
+       top_hits = ifelse(Geneid %in% num_uniq_hits$geneid, 'Yes', 'No'))
 
 total_tpm <- sbp %>%  
   rowwise() %>% 
@@ -340,48 +367,56 @@ total_tpm <- sbp %>%
   select(c('Geneid','total_tpm'))
 
 total_tpm_BlastHits <- mutate(total_tpm,
-       any_hits = ifelse(Geneid %in% num_uniq_hits$geneid, 'Yes', 'No'))
+       top_hits = ifelse(Geneid %in% num_uniq_hits$geneid, 'Yes', 'No'))
 
-boxplot(log1p(total_counts) ~ any_hits , data = total_counts_BlastHits)
-# boxplot(log1p(total_tpm) ~ any_hits , data = total_tpm_BlastHits)
+boxplot(log1p(total_counts) ~ top_hits , data = total_counts_BlastHits)
+# boxplot(log1p(total_tpm) ~ top_hits , data = total_tpm_BlastHits)
 ```
 
 
 ```{r wilcox_test}
-wilcox.test(total_counts$total_counts[total_tpm_BlastHits$any_hits == 'No'], 
-            total_counts$total_counts[total_tpm_BlastHits$any_hits == 'Yes'])
+wilcox.test(total_counts$total_counts[total_tpm_BlastHits$top_hits == 'No'], 
+            total_counts$total_counts[total_tpm_BlastHits$top_hits == 'Yes'])
 ```
 
 #What's the lowest count/tpm assembled gene and the highest count/tpm undetected gene?
 
 ```{r high_count_unassembled}
 total_counts_BlastHits %>% 
-  group_by(any_hits) %>% 
-  filter(any_hits == 'No') %>% 
-  dplyr::slice_max(total_counts, n = 5)
+  group_by(top_hits) %>% 
+  filter(top_hits == 'No') %>% 
+  dplyr::slice_max(total_counts, n = 5) %>%  
+  kbl() %>% kable_styling() %>% scroll_box(width = "100%", height = "200px")
 
 total_tpm_BlastHits %>%
-  group_by(any_hits) %>%
-  filter(any_hits == 'No') %>% 
-  dplyr::slice_max(total_tpm, n = 5)
+  group_by(top_hits) %>%
+  filter(top_hits == 'No') %>% 
+  dplyr::slice_max(total_tpm, n = 5) %>%  
+  kbl() %>% kable_styling() %>% scroll_box(width = "100%", height = "200px")
 ```
 
 
 ```{r low_count_assembled}
-(low_count_hit <- total_counts_BlastHits %>% 
-  group_by(any_hits) %>% 
+low_count_hit <- total_counts_BlastHits %>% 
+  group_by(top_hits) %>% 
   dplyr::slice_min(total_counts, n = 5) %>% 
-  filter(any_hits == 'Yes'))
+  filter(top_hits == 'Yes')
+
+low_count_hit %>%  
+  kbl() %>% kable_styling() %>% scroll_box(width = "100%", height = "200px")
 
 IRanges(blast_dir$sstart_dir, blast_dir$send_dir) %>% 
   split(., blast_dir$geneid) %>% 
   `[[`(., paste(low_count_hit[1,1])) %>% 
   plotRanges(main = paste(low_count_hit[1,1]))
 
-(low_tpm_hit <- total_tpm_BlastHits %>% 
-  group_by(any_hits) %>% 
+low_tpm_hit <- total_tpm_BlastHits %>% 
+  group_by(top_hits) %>% 
   dplyr::slice_min(total_tpm, n = 5) %>% 
-  filter(any_hits == 'Yes'))
+  filter(top_hits == 'Yes')
+
+low_tpm_hit %>%  
+  kbl() %>% kable_styling() %>% scroll_box(width = "100%", height = "200px")
 
 IRanges(blast_dir$sstart_dir, blast_dir$send_dir) %>% 
   split(., blast_dir$geneid) %>% 
@@ -391,36 +426,74 @@ IRanges(blast_dir$sstart_dir, blast_dir$send_dir) %>%
 
 ```{r assemblies_of_low_counts}
 genes_low_count_assembled <- total_counts_BlastHits %>% 
-  group_by(any_hits) %>% 
+  group_by(top_hits) %>% 
   dplyr::slice_min(total_counts, n = 5) %>% 
-  filter(any_hits == 'Yes') %>% 
+  filter(top_hits == 'Yes') %>% 
   .$Geneid
 
 blast %>% 
   filter(str_detect(sseqid, 
                     pattern = paste(genes_low_count_assembled, 
                                     collapse = '|'))) %>% 
-  arrange(sseqid, evalue)
+  arrange(sseqid, evalue) %>%  
+  kbl() %>% kable_styling() %>% scroll_box(width = "100%", height = "200px")
 ```
 
 # Known transcripts with unique and multi-BLASTing de novo transcripts
 
 ```{r pirs_with_uniq_transcript_matched}
-blast %>% 
+multi_uniq_transcript <- blast %>% 
   group_by(qseqid) %>% 
   mutate(num_pirs = ifelse(length(unique(sseqid)) == 1, 
                            'Uniq', 
                            'Multimatch')) %>% 
   ungroup() %>% 
-  group_by(sseqid) %>% 
+  group_by(sseqid, geneid) %>% 
   summarise(uniq_trans = length(unique(qseqid[num_pirs == 'Uniq'])),
             multi_trans = length(unique(qseqid[num_pirs == 'Multimatch'])),
+            num_uniq_len = length(unique(qseqid)),
+            num = length(qseqid),
             lens = paste0(max(length), ', ', min(length)),
             pident = paste0(max(pident),', ',min(pident)),
-            transcripts = paste0(unique(qseqid), 
-                                 collapse = ', ')) %>% 
-  arrange(desc(uniq_trans), multi_trans)
+            # transcripts = paste0(unique(qseqid), 
+            #                      collapse = ', ')
+            ) 
+
+multi_uniq_transcript %>% 
+  select(-geneid) %>% 
+  arrange(desc(uniq_trans), multi_trans )%>%  
+  kbl() %>% kable_styling() %>% scroll_box(width = "100%", height = "200px")
 ```
+
+## Known transcripts with only multimapping hits.
+
+```{r pirs_with_only_multi_transcript_matched}
+multi_uniq_transcript %>% 
+  select(-geneid) %>% 
+  filter(uniq_trans == 0) %>% 
+  arrange(desc(multi_trans) )%>%  
+  kbl() %>% kable_styling() %>% scroll_box(width = "100%", height = "300px")
+```
+
+## Multimapping transcripts by expression
+
+```{r multimap_expression}
+#Note that apparent discrepencies may arise when comparing between these data frames.
+# The number of unique or total transcripts will depend on whether
+# one is only using the best BLAST hits for each query 
+# (e.g. gene_transcription_df), and/or whether the same query with multiple
+# alignments to the same subject is included or not.
+
+multimap_exprssn_df <- merge(gene_transcription_df, 
+                             multi_uniq_transcript, 
+                             by = 'geneid')
+plot(multimap_exprssn_df$multi_trans,
+     log1p(multimap_exprssn_df$total_counts),
+     xlab = 'Number of de novo transcript hits that are \'shared\' with other known transcripts',
+     ylab = 'log Total counts + 1')
+
+```
+
 
 ```{r possible_chimeric_recomb_sequences, eval = FALSE}
 
