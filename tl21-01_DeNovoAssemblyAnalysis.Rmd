@@ -113,6 +113,9 @@ sbp <- read.csv('tl19-07_twentyfour_tpm_samples.csv',
 ```{r read_blast_results}
 # list.files('../blast', pattern = 'outfmt')
 
+#Set a filter for bp length to assume is a valid match
+filter_nident <- 100
+
 outfmt6_headers <- 
   'qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs qcovhsp slen nident' %>% 
   strsplit(split = ' ') %>% 
@@ -132,18 +135,18 @@ blast <- read.table(params$blast_output_file,
          scovhsp = round( (nident/slen * 100), digits = 2),
          scovs = round(((abs(send - sstart) + 1)/slen *100), digits = 2),
          evalue = format(evalue, scientific = TRUE)
-  )
-
-# Filter for the top hits for each de novo transcript by e-value.
-
-blast_top <- group_by(blast, qseqid) %>% 
+  ) %>% 
+  filter(nident > filter_nident)
+  
+  # Filter for the top hits for each de novo transcript by e-value.
+  
+  blast_top <- group_by(blast, qseqid) %>% 
   slice_min(evalue, n = 1)
 
 #Filter for the de novo transcripts which only match a single known pir.
 # Also removing idents below 100 because these are probably poor matches.
 
 blast_uniq <- blast %>% 
-  filter(nident > 100) %>% 
   group_by(qseqid) %>% 
   mutate(num = n_distinct(geneid)) %>% 
   filter(num == 1)
@@ -152,11 +155,14 @@ blast_uniq <- blast %>%
 # all(blast$scovs >= blast$scovhsp)
 ```
 
+Filtering matches by a minimum of `r filter_nident`bp to be a valid match.
+
 # Number of hits for each de novo transcript with a BLAST hit.
+
+Are there many de novo transcripts which match multiple different known transcripts? Are most of them unique?
 
 ```{r number_of_hits_per_deNovoTranscript}
 blast %>% 
-  filter(nident > 0) %>% 
   group_by(qseqid) %>% 
   summarise(num = n_distinct(geneid)) %>% 
   .$num %>% 
@@ -164,9 +170,11 @@ blast %>%
        breaks = 50)
 ```
 
+#Genes with the most number of uniquely mapping de novo transcripts.
+
 ```{r number_of_uniq_transcripts_per_gene}
 blast %>% 
-  filter(nident > 0) %>% 
+  # filter(nident > 0) %>% 
   group_by(qseqid) %>% 
   mutate(num = n_distinct(geneid)) %>% 
   filter(num == 1) %>% 
@@ -186,16 +194,17 @@ blast %>%
   kbl() %>% kable_styling() %>% scroll_box(width = "100%", height = "200px")
 ```
 
-# Coverage of the subject (known transcripts) and query (assembled de novo transcripts) sequences. (Using only the top hits for each de novo transcript)
+# Coverage of the subject (known transcripts) and query (assembled de novo transcripts) sequences. 
+
+Using only the de novo transcripts that uniquely match one known pir transcript.
 
 For our purposes the subject coverage is probably most important.
 
 ```{r}
-plot(blast_top$qcovhsp, blast_top$scovhsp, 
+plot(blast_uniq$qcovhsp, blast_uniq$scovhsp, 
      xlab = 'De novo transcript coverage',
      ylab = 'Known transcript coverage')
 ```
-
 
 Number of unique genes found by BLAST: `r unique(blast$sseqid) %>% length`.
 
