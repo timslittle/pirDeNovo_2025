@@ -10,7 +10,7 @@ output:
       collapsed: false
       smooth_scroll: true
 params:
-  blast_output_file: '/camp/lab/langhornej/working/HPC/littlet/tl21-01_testingTrinityChab24h/blast_pirDatabase/Trinity/trinityAll_blast_211129/trinityDeNovo_PirTranscriptsPccAS_blastn.outfmt6'
+  blast_output_file: '/camp/lab/langhornej/working/HPC/littlet/tl21-01_testingTrinityChab24h/blast_pirDatabase/Trinity/trinity_blast_211124/trinityDeNovo_PirTranscriptsPccAS_blastn.outfmt6'
 ---
 
 # Intro

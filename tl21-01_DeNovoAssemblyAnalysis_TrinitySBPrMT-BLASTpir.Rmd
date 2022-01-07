@@ -10,7 +10,7 @@ output:
       collapsed: false
       smooth_scroll: true
 params:
-  blast_output_file: '/camp/lab/langhornej/working/HPC/littlet/tl21-01_testingTrinityChab24h/blast_pirDatabase/Trinity/trinityAll_blast_211129/trinityDeNovo_PirTranscriptsPccAS_blastn.outfmt6'
+  blast_output_file: '/camp/lab/langhornej/working/HPC/littlet/tl21-01_testingTrinityChab24h/blast_pirDatabase/Trinity/trinitySBPrMTAll_blast/trinityDeNovoSBPrMT_PirTranscriptsPccAS_blastn.outfmt6'
 ---
 
 # Intro
@@ -153,6 +153,8 @@ blast_uniq <- blast %>%
 ```
 
 # Number of hits for each de novo transcript with a BLAST hit.
+
+Are there many de novo transcripts which match multiple different known transcripts? Are most of them unique?
 
 ```{r number_of_hits_per_deNovoTranscript}
 blast %>% 
