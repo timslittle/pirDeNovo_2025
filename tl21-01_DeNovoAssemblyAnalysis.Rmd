@@ -208,32 +208,7 @@ plot(blast_uniq$qcovhsp, blast_uniq$scovhsp,
 
 Number of unique genes found by BLAST: `r unique(blast$sseqid) %>% length`.
 
-# Genes with the most top hits across the transcriptome.
-
-```{r top_uniq_hits}
-blast_topNumHits <- blast_top %>% 
-   group_by(sseqid) %>% 
-   summarise(
-     num = n(),
-     max_id = max(pident),
-     min_id = min(pident),
-     max_nident = max(nident),
-     min_nident = min(nident),
-     max_gap = max(gapopen),
-     min_gap = min(gapopen),
-     max_qcovh = max(qcovhsp),
-     min_qcovh = min(qcovhsp),
-     max_scovh = max(scovhsp),
-     min_scovh = min(scovhsp)
-   ) %>% 
-   arrange(desc(num))
-blast_topNumHits %>% 
-  kbl() %>% kable_styling() %>% scroll_box(width = "100%", height = "200px")
-```
-
-The known transcript with the greatest number of hits is `r blast_topNumHits[1,1]` with a max percentage id of `r blast_topNumHits$max_id[1]`.
-
-# Known transcripts with >95% coverage from one transcript
+# Known transcripts with >95% coverage from one de novo transcript
 
 ```{r transcripts_covering_most_of_known_transcripts}
 transcripts_covered_by_denovo <- blast %>% 
