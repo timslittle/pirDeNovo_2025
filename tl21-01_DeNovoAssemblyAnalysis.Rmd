@@ -167,8 +167,8 @@ Are there many de novo transcripts which match multiple different known transcri
 ```{r number_of_hits_per_deNovoTranscript}
 blast %>% 
   group_by(qseqid) %>% 
-  mutate(num_genes_match = n_distinct(geneid)) %>% 
-  .$num_genes_match %>% 
+  summarise(num = n_distinct(geneid)) %>% 
+  .$num %>% 
   hist(main = 'Histogram of BLAST hits per de novo transcript (50 max)',
        breaks = 50)
 ```
