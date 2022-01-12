@@ -590,7 +590,7 @@ blast %>%
 transcripts_covered_by_denovo_diffcov$`75`
 ```
 
-#Important instant details:
+# Important instant details:
 
 Filtered matches by a minimum of `r filter_nident`bp to be a valid match.
 
