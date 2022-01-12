@@ -160,10 +160,6 @@ blast_uniq <- filter(blast, num_genes_match == 1)
 
 Filtering matches by a minimum of `r filter_nident`bp to be a valid match.
 
-```{r save_blast}
-# write.csv()
-```
-
 # Number of hits for each de novo transcript with a BLAST hit.
 
 Are there many de novo transcripts which match multiple different known transcripts? Are most of them unique?
