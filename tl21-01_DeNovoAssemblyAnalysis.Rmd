@@ -140,7 +140,9 @@ blast <- read.table(params$blast_output_file,
          scovs = round(((abs(send - sstart) + 1)/slen *100), digits = 2),
          evalue = format(evalue, scientific = TRUE)
   ) %>% 
-  filter(nident > filter_nident)
+  filter(nident > filter_nident) %>%
+  group_by(qseqid) %>% 
+  mutate(num_genes_match = n_distinct(geneid))
 
 # Filter for the top hits for each de novo transcript by e-value.
 
@@ -150,10 +152,7 @@ blast_top <- group_by(blast, qseqid) %>%
 #Filter for the de novo transcripts which only match a single known pir.
 # Also removing idents below 100 because these are probably poor matches.
 
-blast_uniq <- blast %>% 
-  group_by(qseqid) %>% 
-  mutate(num = n_distinct(geneid)) %>% 
-  filter(num == 1)
+blast_uniq <- filter(blast, num_genes_match == 1)
 
 #sanity test
 # all(blast$scovs >= blast$scovhsp)
@@ -161,15 +160,16 @@ blast_uniq <- blast %>%
 
 Filtering matches by a minimum of `r filter_nident`bp to be a valid match.
 
+```{r save_blast}
+# write.csv()
+```
+
 # Number of hits for each de novo transcript with a BLAST hit.
 
 Are there many de novo transcripts which match multiple different known transcripts? Are most of them unique?
 
 ```{r number_of_hits_per_deNovoTranscript}
-blast %>% 
-  group_by(qseqid) %>% 
-  summarise(num = n_distinct(geneid)) %>% 
-  .$num %>% 
+blast$num_genes_match%>% 
   hist(main = 'Histogram of BLAST hits per de novo transcript (50 max)',
        breaks = 50)
 ```
@@ -178,10 +178,7 @@ blast %>%
 
 ```{r number_of_uniq_transcripts_per_gene}
 blast %>% 
-  # filter(nident > 0) %>% 
-  group_by(qseqid) %>% 
-  mutate(num = n_distinct(geneid)) %>% 
-  filter(num == 1) %>% 
+  filter(num_genes_match== 1) %>% 
   group_by(geneid) %>% 
   summarise(num_of_uniq_deNovoTranscripts = n_distinct(qseqid),
             max_id = max(pident),
