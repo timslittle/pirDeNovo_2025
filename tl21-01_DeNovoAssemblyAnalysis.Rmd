@@ -19,9 +19,13 @@ This script is looks at the BLAST results of a Trinity _de novo_ assembled trans
 
 # What this report shows:
 
-* The level of counts / TPM of pirs that are detected by the Trinity de novo assembled transcriptome.
+*The level of counts / TPM of pirs that are detected by the Trinity de novo assembled transcriptome.
+**e.g. What is the minimum expressed gene detected / What is the maximally expressed gene not detected.
 
-** e.g. What is the minimum expressed gene detected / What is the maximally expressed gene not detected.
+# To-do:
+*Check how they BLAST to the rest of the transcriptome, do pir de novo transcripts also BLAST to non-pir transcripts?
+*Select the most informative data and poo-poo the rest.
+*Save useful files made by this script as csv.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, 
@@ -44,6 +48,7 @@ library('stringr')
 library('purrr')
 library('IRanges')
 library('kableExtra')
+library('plotly')
 ```
 
 ```{r function_ordering}
@@ -77,7 +82,6 @@ plotRanges <- function(x, xlim = x, main = deparse(substitute(x)),  col = "black
   axis(1)
 }
 ```
-
 
 ```{r load_data}
 pir.info <- read.delim('Pchabaudi_pir_info.txt', sep = '\t')
@@ -122,7 +126,7 @@ outfmt6_headers <-
   unlist
 
 blast <- read.table(params$blast_output_file,
-  col.names = outfmt6_headers) %>% 
+                    col.names = outfmt6_headers) %>% 
   mutate(geneid = str_extract(sseqid, 
                               pattern = '(?<=gene=).+(?=___or)'),
          sseqid = unlist(
@@ -137,10 +141,10 @@ blast <- read.table(params$blast_output_file,
          evalue = format(evalue, scientific = TRUE)
   ) %>% 
   filter(nident > filter_nident)
-  
-  # Filter for the top hits for each de novo transcript by e-value.
-  
-  blast_top <- group_by(blast, qseqid) %>% 
+
+# Filter for the top hits for each de novo transcript by e-value.
+
+blast_top <- group_by(blast, qseqid) %>% 
   slice_min(evalue, n = 1)
 
 #Filter for the de novo transcripts which only match a single known pir.
@@ -191,7 +195,7 @@ blast %>%
             max_scovh = max(scovhsp),
             min_scovh = min(scovhsp)) %>% 
   arrange(desc(num_of_uniq_deNovoTranscripts)) %>% 
-  kbl() %>% kable_styling() %>% scroll_box(width = "100%", height = "200px")
+  kbl() %>% kable_styling() %>% scroll_box(width = "100%", height = "400px")
 ```
 
 # Coverage of the subject (known transcripts) and query (assembled de novo transcripts) sequences. 
@@ -200,24 +204,69 @@ Using only the de novo transcripts that uniquely match one known pir transcript.
 
 For our purposes the subject coverage is probably most important.
 
-```{r}
-plot(blast_uniq$qcovhsp, blast_uniq$scovhsp, 
-     xlab = 'De novo transcript coverage',
-     ylab = 'Known transcript coverage')
+```{r scov_v_qcov}
+fig <- plot_ly(
+  blast_uniq,
+  x = ~qcovhsp,
+  y = ~scovhsp,
+  text = ~paste(sseqid)
+) %>% 
+  layout(xaxis = list(title = "De novo transcript coverage"),
+         yaxis = list(title = "Known transcript coverage"))
+fig
 ```
 
 Number of unique genes found by BLAST: `r unique(blast$sseqid) %>% length`.
 
-# Known transcripts with >95% coverage from one de novo transcript
+# Known transcripts with >95% coverage from one de novo transcript.
+
+How many of the known transcripts are covered >=95% by de novo transcripts?
+
+num_match_all and num_match_95 show how many other known transcripts these de novo transcripts match in total or >=95% respectively.
 
 ```{r transcripts_covering_most_of_known_transcripts}
 transcripts_covered_by_denovo <- blast %>% 
-   group_by(sseqid) %>% 
-   filter(scovhsp >= 95) %>% 
+  group_by(qseqid) %>%
+  mutate(num_match_all = n_distinct(sseqid)) %>%
+  group_by(sseqid) %>% 
+  filter(scovhsp >= 95) %>% 
+  group_by(qseqid) %>%
+  mutate(num_match_95 = n_distinct(sseqid)) %>% 
   arrange(geneid)
 transcripts_covered_by_denovo %>% 
   kbl() %>% kable_styling() %>% scroll_box(width = "100%", height = "300px")
+```
 
+Showing the BLAST alignments of these >=95% coverage de novo transcripts in a graph, and all the matches they have. 
+The "n =" number after the transcript name shows how many other BLAST hits the de novo transcript had in total.
+Size of each point shows the 
+
+```{r transcripts_covering_most_of_known_transcripts_graph}
+blast %>% 
+  filter(qseqid %in% unique(transcripts_covered_by_denovo$qseqid)) %>%
+  group_by(qseqid) %>%
+  mutate(num_match_all = n_distinct(sseqid)) %>% 
+  mutate(qseqid = paste0(qseqid, '; n = ', num_match_all),
+         over95 = ifelse(scovhsp >= 95, 
+                         '>=95% coverage', 
+                         '<95% coverage')) %>% 
+  plot_ly(x = ~qcovhsp,
+          y = ~scovhsp,
+          text = ~paste(sseqid, '\n', 
+                        length, 'bp', '\n',
+                        scovhsp, '% coverage of known'),
+          color = ~qseqid,
+          size = ~length,
+          symbol = ~over95,
+          symbols = c('triangle-up', 'circle'),
+          sizes = c(2,100),
+          legendgroup = ~qseqid) %>% 
+  layout(xaxis = list(title = "De novo transcript coverage"),
+         yaxis = list(title = "Known transcript coverage"))
+```
+
+
+```{r transcript_coverage_by_percentage}
 transcripts_covered_by_denovo_diffcov <- lapply(seq(0,100,by = 5),
                                                 function(covrg) {
                                                   blast %>% 
@@ -235,8 +284,6 @@ axis(2, at = seq(0,250,by = 25))
 abline(a = 25, b = 0)
                                                     
 ```
-
-There are `r length(unique(transcripts_covered_by_denovo$geneid))` known transcripts covered by >=95% of at least one individual _de novo_ transcript.
 
 # Number of top hits v counts/TPM
 
@@ -359,12 +406,6 @@ total_tpm_BlastHits <- mutate(total_tpm,
 
 boxplot(log1p(total_counts) ~ top_hits , data = total_counts_BlastHits)
 # boxplot(log1p(total_tpm) ~ top_hits , data = total_tpm_BlastHits)
-```
-
-
-```{r wilcox_test}
-wilcox.test(total_counts$total_counts[total_tpm_BlastHits$top_hits == 'No'], 
-            total_counts$total_counts[total_tpm_BlastHits$top_hits == 'Yes'])
 ```
 
 #What's the lowest count/tpm assembled gene and the highest count/tpm undetected gene?
@@ -530,3 +571,7 @@ blast %>%
   arrange(desc(num_genes_hit), qseqid)
 ```
 
+#Important instant details:
+
+There are `r length(unique(transcripts_covered_by_denovo$geneid))` known transcripts covered by >=95% of at least one individual _de novo_ transcript. Of these `r length(unique(transcripts_covered_by_denovo$geneid[transcripts_covered_by_denovo$num_match_all == 1]))`
+ only match the 
