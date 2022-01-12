@@ -603,7 +603,7 @@ transcripts_covered_by_denovo_diffcov$`75`
 Filtered matches by a minimum of `r filter_nident`bp to be a valid match.
 
 There are `r length(unique(transcripts_covered_by_denovo$geneid))` known transcripts covered by >=95% of at least one individual _de novo_ transcript. There is a mean of `r mean(transcripts_covered_by_denovo$mismatch)` mismatches and `r mean(transcripts_covered_by_denovo$gapopen)` gaps and a median of `r median(transcripts_covered_by_denovo$mismatch)` mismatches and `r median(transcripts_covered_by_denovo$gapopen)` gaps in these alignments (Note that there are probably some de novo transcripts that align >=95% to the same known transcript). Of these `r length(unique(transcripts_covered_by_denovo$geneid[transcripts_covered_by_denovo$num_match_all == 1]))`
- match only that known transcript and no others by the BLAST search. `r length(unique(select(filter(transcripts_covered_by_denovo, qcovhsp < 50), geneid)))` of the genes with >=95% known transcript alignments cover less than 50% of the de novo transcript.
+ match only that known transcript and no others by the BLAST search. `r length(unique(select(filter(ungroup(transcripts_covered_by_denovo), qcovhsp < 50), geneid)))` of the genes with >=95% known transcript alignments cover less than 50% of the de novo transcript.
  
 See section [Known transcripts with >95% coverage from one de novo transcript.].
  
