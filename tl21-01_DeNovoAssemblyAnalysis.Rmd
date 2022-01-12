@@ -165,7 +165,10 @@ Filtering matches by a minimum of `r filter_nident`bp to be a valid match.
 Are there many de novo transcripts which match multiple different known transcripts? Are most of them unique?
 
 ```{r number_of_hits_per_deNovoTranscript}
-blast$num_genes_match%>% 
+blast %>% 
+  group_by(qseqid) %>% 
+  mutate(num_genes_match = n_distinct(geneid)) %>% 
+  .$num_genes_match %>% 
   hist(main = 'Histogram of BLAST hits per de novo transcript (50 max)',
        breaks = 50)
 ```
