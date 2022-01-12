@@ -234,12 +234,13 @@ transcripts_covered_by_denovo <- blast %>%
   mutate(num_match_95 = n_distinct(sseqid)) %>% 
   arrange(geneid)
 transcripts_covered_by_denovo %>% 
+  select(-qstart,-qend,-sstart,-send,-evalue,-bitscore,-qcovs,-slen,-geneid,-nident,-scovs) %>% 
   kbl() %>% kable_styling() %>% scroll_box(width = "100%", height = "300px")
 ```
 
 Showing the BLAST alignments of these >=95% coverage de novo transcripts in a graph, and all the matches they have. 
 The "n =" number after the transcript name shows how many other BLAST hits the de novo transcript had in total.
-Size of each point shows the 
+Size of each point shows the length of the alignment.
 
 ```{r transcripts_covering_most_of_known_transcripts_graph}
 blast %>% 
@@ -267,6 +268,7 @@ blast %>%
 
 
 ```{r transcript_coverage_by_percentage}
+
 transcripts_covered_by_denovo_diffcov <- lapply(seq(0,100,by = 5),
                                                 function(covrg) {
                                                   blast %>% 
@@ -274,9 +276,11 @@ transcripts_covered_by_denovo_diffcov <- lapply(seq(0,100,by = 5),
                                                     filter(scovhsp >= covrg) %>%
                                                     .$geneid %>% unique %>% length
                                                 })
+names(transcripts_covered_by_denovo_diffcov) <- seq(0,100,by = 5)
 plot(y = unlist(transcripts_covered_by_denovo_diffcov), 
      x = seq(0,100,by = 5),
      ylim = c(0,225),
+     main = 'For all de novo transcripts',
      ylab = 'Number of known transcripts covered',
      xlab = 'Percentage of coverage by individual transcripts',
      yaxt = 'none')
@@ -285,7 +289,28 @@ abline(a = 25, b = 0)
                                                     
 ```
 
-# Number of top hits v counts/TPM
+```{r uniq_transcript_coverage_by_percentage}
+transcripts_covered_by_denovo_uniq_diffcov <- lapply(seq(0,100,by = 5),
+                                                function(covrg) {
+                                                  blast_uniq %>% 
+                                                    group_by(sseqid) %>% 
+                                                    filter(scovhsp >= covrg) %>%
+                                                    .$geneid %>% unique %>% length
+                                                })
+plot(y = unlist(transcripts_covered_by_denovo_uniq_diffcov), 
+     x = seq(0,100,by = 5),
+     ylim = c(0,225),
+     main = 'For uniquely mapping de novo transcipts',
+     ylab = 'Number of known transcripts covered',
+     xlab = 'Percentage of coverage by individual transcripts',
+     yaxt = 'none')
+axis(2, at = seq(0,250,by = 25))
+abline(a = 25, b = 0)
+                   
+```
+
+
+# Number of top hits for each de novo transcript v counts/TPM
 
 ```{r uniq_hits_v_counts}
 num_uniq_hits <- blast_top %>% 
@@ -293,9 +318,6 @@ num_uniq_hits <- blast_top %>%
   summarise(num = n()) %>% 
   arrange(geneid) %>% 
   filter(geneid %in% counts$Geneid)
-```
-
-```{r uniq_hits_v_counts_plots}
 
 total_counts_ofBlast <- filter(counts, 
                                Geneid %in% pir.info$Gene.ID) %>% 
@@ -348,7 +370,7 @@ axis(1, at = log1p(c(0, 1, 2, 3, 5, 20, 50, 100)), labels = c(0, 1, 2, 3, 5, 20,
 #  Need to make sure the order is always the same.
 #  I think this coverage could still include gaps.
 
-blast_dir <- blast_top %>% 
+blast_dir <- blast %>% 
   mutate(direction = ifelse(sstart > send, '-', '+'),
          sstart_dir = ifelse(sstart > send, send, sstart),
          send_dir = ifelse(sstart > send, sstart, send))
@@ -424,7 +446,6 @@ total_tpm_BlastHits %>%
   kbl() %>% kable_styling() %>% scroll_box(width = "100%", height = "200px")
 ```
 
-
 ```{r low_count_assembled}
 low_count_hit <- total_counts_BlastHits %>% 
   group_by(top_hits) %>% 
@@ -480,7 +501,7 @@ multi_uniq_transcript <- blast %>%
   group_by(sseqid, geneid) %>% 
   summarise(uniq_trans = length(unique(qseqid[num_pirs == 'Uniq'])),
             multi_trans = length(unique(qseqid[num_pirs == 'Multimatch'])),
-            num_uniq_len = length(unique(qseqid)),
+            num_uniq = length(unique(qseqid)),
             num = length(qseqid),
             lens = paste0(max(length), ', ', min(length)),
             pident = paste0(max(pident),', ',min(pident)),
@@ -491,7 +512,7 @@ multi_uniq_transcript <- blast %>%
 multi_uniq_transcript %>% 
   select(-geneid) %>% 
   arrange(desc(uniq_trans), multi_trans )%>%  
-  kbl() %>% kable_styling() %>% scroll_box(width = "100%", height = "200px")
+  kbl() %>% kable_styling() %>% scroll_box(width = "100%", height = "400px")
 ```
 
 ## Known transcripts with only multimapping hits.
@@ -569,9 +590,12 @@ blast %>%
   group_by(qseqid) %>% 
   mutate(num_genes_hit = n_distinct(sseqid)) %>% 
   arrange(desc(num_genes_hit), qseqid)
+transcripts_covered_by_denovo_diffcov$`75`
 ```
 
 #Important instant details:
 
 There are `r length(unique(transcripts_covered_by_denovo$geneid))` known transcripts covered by >=95% of at least one individual _de novo_ transcript. Of these `r length(unique(transcripts_covered_by_denovo$geneid[transcripts_covered_by_denovo$num_match_all == 1]))`
- only match the 
+ only match that known transcript and no others by the BLAST search.
+ 
+With a threshold of 75% coverage `r transcripts_covered_by_denovo_diffcov['75']` known transcripts are represented by the de novo transcripts.
