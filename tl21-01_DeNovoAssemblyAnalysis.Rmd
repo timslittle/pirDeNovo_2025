@@ -10,7 +10,7 @@ output:
       collapsed: false
       smooth_scroll: true
 params:
-  blast_output_file: '/camp/lab/langhornej/working/HPC/littlet/tl21-01_testingTrinityChab24h/blast_pirDatabase/Trinity/trinityAll_blast_211129/trinityDeNovo_PirTranscriptsPccAS_blastn.outfmt6'
+  blast_output_file: '/camp/lab/langhornej/working/HPC/littlet/tl21-01_testingTrinityChab24h/blast_pirDatabase/scspades/scspades_SBPrMT-mR-rRNAdep/scspades_SBPrMT-mR-rRNAdep_blastn.outfmt6'
 ---
 
 # Intro
@@ -90,28 +90,13 @@ counts <- read.csv('tl19-07_twentyfour_counts_samples.csv',
                    header = TRUE,
                    stringsAsFactors = FALSE) %>% 
   filter(Geneid %in% pir.info$Gene.ID) %>% 
-  select(matches('Geneid|SBP')) %>% 
   select(colnames(.)[order(colnames(.))])
 
-sbp <- read.csv('tl19-07_twentyfour_tpm_samples.csv',
+tpm_data <- read.csv('tl19-07_twentyfour_tpm_samples.csv',
                    header = TRUE,
                    stringsAsFactors = FALSE) %>% 
   filter(Geneid %in% pir.info$Gene.ID) %>% 
-  select(matches('Geneid|SBP')) %>% 
   select(colnames(counts)[order(colnames(counts))])
-```
-
-```{r check_tpm}
-
-#Check that TPM all add to a million
-
-# all(
-#   sapply(apply(sbp[,-1], 2, sum),
-#          all.equal,
-#          1e6,
-#          tolerance = 0.001)
-# )
-  
 ```
 
 ```{r read_blast_results}
@@ -314,6 +299,17 @@ abline(a = 25, b = 0)
                    
 ```
 
+# Highest coverage by an individual transcript v counts/TPM
+
+```{r high_cov_v_counts}
+blast_high <- blast %>% 
+  group_by(sseqid, geneid) %>% 
+  slice_min(order_by = evalue, n = 1) %>% 
+  slice_max(order_by = scovhsp, n = 1)
+
+length(unique(blast_high$qseqid)) # Some may be shared between genes.
+```
+
 
 # Number of top hits for each de novo transcript v counts/TPM
 
@@ -328,7 +324,7 @@ total_counts_ofBlast <- filter(counts,
                                Geneid %in% pir.info$Gene.ID) %>% 
   rowwise() %>% 
   mutate(geneid = Geneid,
-  total_counts = sum(c_across(matches('SBP')))) %>% 
+  total_counts = sum(c_across(matches('SBP|RMT')))) %>% 
   select(c('geneid','total_counts'))
 
 #Missing pir genes set to zero 
@@ -339,12 +335,12 @@ num_uniq_hits <- rbind(num_uniq_hits,
                        missing) %>% 
   arrange(geneid)
 
-total_tpm_ofBlast <- filter(sbp, 
+total_tpm_ofBlast <- filter(tpm_data, 
        Geneid %in% pir.info$Gene.ID) %>% 
   arrange(Geneid) %>% 
   rowwise() %>% 
   mutate(geneid = Geneid, 
-         total_tpm = sum(c_across(matches('SBP')))) %>% 
+         total_tpm = sum(c_across(matches('SBP|rMT')))) %>% 
   select(c('geneid','total_tpm'))
 
 # Combine the dfs
@@ -415,16 +411,16 @@ num_uniq_hits <- blast_top %>%
 
 total_counts <- counts %>%  
   rowwise() %>% 
-  mutate(total_counts = sum(c_across(matches('SBP')))) %>% 
+  mutate(total_counts = sum(c_across(matches('SBP|rMT')))) %>% 
   ungroup %>% 
   select(c('Geneid','total_counts'))
 
 total_counts_BlastHits <- mutate(total_counts,
        top_hits = ifelse(Geneid %in% num_uniq_hits$geneid, 'Yes', 'No'))
 
-total_tpm <- sbp %>%  
+total_tpm <- tpm_data %>%  
   rowwise() %>% 
-  mutate(total_tpm = sum(c_across(matches('SBP')))) %>% 
+  mutate(total_tpm = sum(c_across(matches('SBP|rMT')))) %>% 
   ungroup %>% 
   select(c('Geneid','total_tpm'))
 
