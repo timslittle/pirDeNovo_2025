@@ -12,7 +12,7 @@ output:
 params:
   assembly_name: "21659_8-4_rnaspades_0.90cdhitest"
   assembly_file: "/camp/lab/langhornej/working/HPC/littlet/tl21-01_testingTrinityChab24h/cd-hit-est/21659_8-4/rnaspades_21659_8-4_0.90_cdhitest.fasta"
-  blast_output_file: "/camp/lab/langhornej/working/HPC/littlet/tl21-01_testingTrinityChab24h/blast_pirDatabase/rnaspades/21659_8-4/21659_8-4_cdhit0.90_blastn.outfmt6"
+  blast_output_file: "/camp/lab/langhornej/working/HPC/littlet/tl21-01_testingTrinityChab24h/blast_pirDatabase/rnaspades/21659_8-4/21659_8-4_blastn.outfmt6"
   new_table: FALSE
 ---
 
@@ -186,7 +186,7 @@ Number of unique genes found by BLAST: `r unique(blast$sseqid) %>% length`.
 
 # Known transcripts with >95% coverage from one de novo transcript.
 
-How many of the known transcripts are covered >=95% by de novo transcripts?
+How many of the known transcripts are covered >=95% of their sequence by de novo transcripts, with >=95% identity?
 
 num_match_all and num_match_95 show how many other known transcripts these de novo transcripts match in total or >=95% respectively.
 
@@ -342,23 +342,35 @@ number_transcripts <- system(paste0('cat ',
   number_knownCovOver95 <- length(unique(transcripts_covered_by_denovo$geneid))
   number_knownCovOver75 <- length(unique(transcripts_covered_by_denovo_75$geneid))
   
+  number_knownCovOver95_idOver95 <-length(unique(filter(transcripts_covered_by_denovo, 
+                                                        pident >= 95)$geneid))
+  number_knownCovOver75_idOver95 <- length(unique(filter(transcripts_covered_by_denovo_75, 
+                                                         pident >= 95)$geneid))
+  
+  
   number_knownCovOver95_deNovoCovUnder50 <- length(unique(filter(
     ungroup(transcripts_covered_by_denovo), 
     qcovhsp < 50
   )$geneid))
   
-  ancestral_over95 <- ifelse(
+  number_knownCovOver95_idOver95_deNovoCovUnder50 <- length(unique(filter(
+    ungroup(transcripts_covered_by_denovo), 
+    qcovhsp < 50,
+    pident >= 95
+  )$geneid))
+  
+  ancestral_over95_id <- ifelse(
     any(grepl(transcripts_covered_by_denovo$sseqid,
               pattern = 'PCHAS_0101200')),
-    paste(transcripts_covered_by_denovo$sseqid[
+    paste(transcripts_covered_by_denovo$pident[
       grepl(transcripts_covered_by_denovo$sseqid,
             pattern = 'PCHAS_0101200')
     ], sep = '; '),
     0)
-  ancestral_over75 <- ifelse(
+  ancestral_over75_id <- ifelse(
     any(grepl(transcripts_covered_by_denovo_75$sseqid,
               pattern = 'PCHAS_0101200')),
-    paste(transcripts_covered_by_denovo_75$sseqid[
+    paste(transcripts_covered_by_denovo_75$pident[
       grepl(transcripts_covered_by_denovo_75$sseqid,
             pattern = 'PCHAS_0101200')
     ], sep = '; '),
@@ -381,10 +393,12 @@ df_save <- data.frame(
   "num_transcripts" = number_transcripts,
   
   "knwn_trnscrpt_cvg_over75" = number_knownCovOver75,
-  "ancestral_over75" = ancestral_over75,
+  "knwn_trnscrpt_cvg_over75_idOver95" = number_knownCovOver75_idOver95,
+  "ancestral_id_over75" = ancestral_over75_id,
   "knwn_trnscrpt_cvg_over95" = number_knownCovOver95,
+  "knwn_trnscrpt_cvg_over95_idOver95" = number_knownCovOver95_idOver95,
   "knwn_trnscrpt_cvg_over95_deNovoCvgUnder50" = number_knownCovOver95_deNovoCovUnder50,
-  "ancestral_over95" = ancestral_over95,
+  "ancestral_id_over95" = ancestral_over95_id,
   
   "mean_mismatches" = mean_mismatches,
   "mean_gaps" = mean_gaps,
