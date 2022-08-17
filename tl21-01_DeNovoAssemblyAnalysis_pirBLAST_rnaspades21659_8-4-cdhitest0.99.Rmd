@@ -15,7 +15,7 @@ params:
 
 # Intro
 
-This script is looks at the BLAST results of a Trinity _de novo_ assembled transcriptome. 
+This script is looks at the BLAST results of a _de novo_ assembled transcriptome. 
 
 # What this report shows:
 
