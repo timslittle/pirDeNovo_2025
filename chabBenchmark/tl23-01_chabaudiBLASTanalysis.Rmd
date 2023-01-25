@@ -247,10 +247,6 @@ transcripts_covered_by_denovo <- lapply(blast, function(blast_df){
               transcripts_covered_by_denovo_75 = transcripts_covered_by_denovo_75
   ))
 })
-names(transcripts_covered_by_denovo) <- names(blast)
-lapply(transcripts_covered_by_denovo, getElement, 'possible_chimeras')
-transcripts_covered_by_denovo$`21659_8#9_spadesSC`
-transcripts_covered_by_denovo$`21659_8#9_evigene`
 ```
 
 Showing the BLAST alignments of these >=95% coverage de novo transcripts in a graph, and all the matches they have. 
@@ -258,63 +254,6 @@ The "n =" number after the transcript name shows how many other BLAST hits the d
 Size of each point shows the length of the alignment.
 
 Evigene appears to have few possible chimeras, is it removing them? Do the hits to ancestral still remain?
-
-```{r transcripts_covering_most_of_known_transcripts_graph}
-lapply(transcripts_covered_by_denovo[1:10], 
-       function(blast_list) {
-  blast_list$blast_df %>% 
-  filter(qseqid %in% unique(blast_list$transcripts_covered_by_denovo_df$qseqid)) %>%
-  group_by(qseqid) %>%
-  mutate(num_match_all = n_distinct(sseqid)) %>% 
-  mutate(qseqid = paste0(qseqid, '; n = ', num_match_all),
-         over95 = ifelse(scovhsp >= 95, 
-                         '>=95% coverage', 
-                         '<95% coverage')) %>% 
-  plot_ly(x = ~qcovhsp,
-          y = ~scovhsp,
-          text = ~paste(sseqid, '\n', 
-                        length, 'bp', '\n',
-                        scovhsp, '% coverage of known'),
-          color = ~qseqid,
-          size = ~length,
-          symbol = ~over95,
-          symbols = c('triangle-up', 'circle'),
-          sizes = c(2,100),
-          legendgroup = ~qseqid) %>% 
-  layout(xaxis = list(title = "De novo transcript coverage"),
-         yaxis = list(title = "Known transcript coverage"))
-})
-```
-
-Alignments with >=95% known coverage but <50% de novo transcript coverage. Sign of chimeric transcripts.
-
-# All the BLAST matches 
-
-Fix: Colours for low numbers of hits.
-
-```{r transcripts_coverage_allHits_transcripts_graph}
-transcripts_covered_by_denovo$`21659_8#1_evigene`$blast_df %>% 
-  group_by(qseqid) %>%
-  mutate(num_match_all = n_distinct(sseqid)) %>% 
-  mutate(qseqid = paste0(qseqid, '; n = ', num_match_all),
-         over95 = ifelse(scovhsp >= 95, 
-                         '>=95% coverage', 
-                         '<95% coverage')) %>% 
-  plot_ly(x = ~qcovhsp,
-          y = ~scovhsp,
-          legendgroup = ~qseqid) %>% 
-  add_markers(text = ~paste(sseqid, '\n', 
-                            length, 'aa', '\n',
-                            scovhsp, '% coverage of known'),
-              color = ~qseqid,
-              size = ~length,
-              symbol = ~over95,
-              symbols = c('triangle-up', 'circle'),
-              colors = "Set1",
-              sizes = c(2,100)) %>% 
-  layout(xaxis = list(title = "De novo transcript coverage"),
-         yaxis = list(title = "Known transcript coverage"))
-```
 
 ```{r sample_assembly_list}
 sample_blast.list <- lapply(sample_names, 
@@ -372,7 +311,7 @@ lapply(sample_names,
                          linetype = as.factor(pident),
                          col = assembler),
                      size = .75) +
-           scale_linetype_manual(values = c('100' = 2, '90' = 1, '75' = 2), 
+           scale_linetype_manual(values = c('100' = 2, '90' = 1, '75' = 4), 
                                  name = '% identity') +
            theme_classic() +
            ylab('Number of known transcripts covered') +
@@ -381,73 +320,53 @@ lapply(sample_names,
        })
 ```
 
-```{r save_plot}
-# pdf(file = paste0('plots/', 
-#                       params$assembly_name,
-#                       '_Coverage-Identity.pdf'),
-#     height = 5,
-#     width = 8)
-# plot(y = transcripts_covered_by_denovo_diffcov$num_transcripts, 
-#      x = transcripts_covered_by_denovo_diffcov$covrg,
-#      col = cols_plot,
-#      pch = c(16),
-#      ylim = c(0,225),
-#      ylab = 'Number of known transcripts covered',
-#      xlab = 'Percentage of coverage by individual transcripts',
-#      yaxt = 'none')
-# axis(2, at = round(seq(0,nrow(pir.info),by = nrow(pir.info)/8)))
-# abline(a = round(nrow(pir.info)/4), b = 0, lty = 2)
-# abline(a = round(nrow(pir.info)/2), b = 0, lty = 2)
-# abline(a = round(3*nrow(pir.info)/4), b = 0, lty = 2)
-# legend(90, 224, 
-#        legend=sort(unique(transcripts_covered_by_denovo_diffcov$pident)),
-#        col = cols_plot,
-#        cex=0.75, pch = 16,
-#        bg = "white",
-#        title = '% Identity'
-# )
-# dev.off()
-```
-
 ```{r cvrg_stats}
 
 transcriptCvrg.df <- lapply(names(sample_blast.list),
-       function(sample) {
-         assembly_blast.list <- getElement(sample_blast.list, sample)
-         lapply(names(assembly_blast.list), function(assembler) {
-           assembly_df <- getElement(assembly_blast.list, assembler)
-           transcripts_df <- assembly_df$transcripts_covered_by_denovo_df %>% 
-             filter(scovhsp >= 95) %>% 
-             mutate(assembler = assembler,
-                    sample = sample) %>%
-             group_by(assembler, sample) %>% 
-             summarise(num_transcripts = n_distinct(sseqid),
-                       num_deNovo = length(qseqid),
-                       med_mismatch = median(mismatch),
-                       med_gap = median(gapopen),
-                       min_scovhsp = min(qcovhsp),
-                       max_scovhsp = max(qcovhsp))
-           if(nrow(transcripts_df) == 0) {
-             transcripts_df <- data.frame('assembler' = assembler,
-                                          'sample' = sample,
-                                          'num_transcripts' = 0,
-                                          'num_deNovo' = 0)
-           }
-           return(transcripts_df)
-         })
-       }) %>% bind_rows
+                            function(sample) {
+                              assembly_blast.list <- getElement(sample_blast.list, sample)
+                              lapply(names(assembly_blast.list), function(assembler) {
+                                assembly_df <- getElement(assembly_blast.list, assembler)
+                                transcripts_df <- lapply(c(50,75,90,95,100), 
+                                       function(threshold){
+                                         transcripts_df <- assembly_df$blast_df %>% 
+                                           filter(scovhsp >= threshold,
+                                                  pident >= 95) %>% 
+                                           mutate(assembler = assembler,
+                                                  sample = sample,
+                                                  threshold = threshold) %>%
+                                           group_by(assembler, sample, threshold) %>% 
+                                           summarise(num_transcripts = n_distinct(sseqid),
+                                                     num_deNovo = length(qseqid),
+                                                     med_mismatch = median(mismatch),
+                                                     med_gap = median(gapopen),
+                                                     min_scovhsp = min(qcovhsp),
+                                                     max_scovhsp = max(qcovhsp))
+                                         if(nrow(transcripts_df) == 0) {
+                                           transcripts_df <- data.frame('assembler' = assembler,
+                                                                        'sample' = sample,
+                                                                        'num_transcripts' = 0,
+                                                                        'num_deNovo' = 0,
+                                                                        'threshold' = threshold)
+                                         }
+                                         return(transcripts_df)
+                                       }) %>% bind_rows
+                              })
+                            }) %>% bind_rows
 
-transcriptCvrg.df %>% group_by(sample) %>% slice_max(num_transcripts, n =1)
-
-boxplot(transcriptCvrg.df$num_transcripts ~ transcriptCvrg.df$assembler)
+# transcriptCvrg.df %>% group_by(sample) %>% slice_max(num_transcripts, n =1)
+# 
+# boxplot(transcriptCvrg.df$num_transcripts ~ transcriptCvrg.df$assembler)
 
 ggplot(transcriptCvrg.df, aes(x = assembler, 
-                              y = num_transcripts)) +
+                              y = num_transcripts,
+                              col = assembler)) +
   geom_boxplot() +
-  geom_point(aes(col = sample)) +
-  geom_line(aes(col = sample, group = sample)) +
   theme_classic() +
-  theme(legend.position = 'none')
+  theme(axis.text.x = element_blank()) +
+  xlab('Method of transcriptome assembly/meta-assembly') +
+  ylab('Number of known transcripts matched') +
+  facet_grid(~ threshold)
 
 ```
 
@@ -467,7 +386,7 @@ transcripts.df <- lapply(names(sample_blast.list),
          })
        }) %>% bind_rows
 
-unique(data.table(transcripts.df), by = c("sample","sseqid")) %>% 
+uniq_genes <- unique(data.table(transcripts.df), by = c("sample","sseqid")) %>% 
   select(qseqid, sseqid, assembler, sample, everything()) %>% 
   # filter(assembler != 'evigene') %>% 
   arrange(sseqid, sample)
@@ -527,6 +446,39 @@ ggplot(evigene_v_rest, aes(x = assembler,
   theme(legend.position = 'none')
 ```
 
+# Save BLAST hits for supplementary info.
+
+```{r suppl_blast_hits}
+
+uniq_genes_id <- apply(uniq_genes[,c('qseqid','sseqid','sample')],
+                       1,
+                       paste,
+                       collapse = ' ')
+
+blast_hits.df <- lapply(names(sample_blast.list),
+                        function(sample) {
+                          assembly_blast.list <- getElement(sample_blast.list, sample)
+                          lapply(names(assembly_blast.list), function(assembler) {
+                            assembly_df <- getElement(assembly_blast.list, assembler)
+                            transcripts_df <- assembly_df$transcripts_covered_by_denovo_df %>% 
+                              mutate(assembler = assembler,
+                                     sample = sample) %>%
+                              mutate(possible_chimera = ifelse(qcovhsp <= 50 && scovhsp >= 95, 
+                                                               TRUE, 
+                                                               FALSE),
+                                     unique_assembly_match = ifelse(paste(qseqid, sseqid, sample) %in% 
+                                                                      uniq_genes_id,
+                                                                    TRUE,
+                                                                    FALSE),
+                                     uniq_id = paste(qseqid, sseqid, sample, 
+                                                     collapse = '_')) %>% 
+                            group_by(sample, assembler) %>% 
+                              select(qseqid, sseqid, assembler, sample, everything())
+                            return(transcripts_df)
+                          })
+       }) %>% bind_rows
+
+```
 
 ```{r data_to_save}
 number_transcripts <- system(paste0('cat ',
