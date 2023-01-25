@@ -1,0 +1,106 @@
+---
+title: "tl21-01 Overlay Coverage Graph"
+output: 
+  html_document:
+    theme: cosmo
+    code_download: true
+    toc: true
+    number_sections: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, 
+                      results = TRUE, 
+                      message = FALSE, 
+                      warning = FALSE)
+options(scipen = 999) # Means that numbers are displayed normally not as 1e6 (1000000)
+```
+
+```{r loading_packages, include = FALSE, message = FALSE}
+# Load the required packages
+library('readr')
+library('dplyr', 
+        lib.loc = "/camp/home/littlet/R/x86_64-pc-linux-gnu-library/4.0")
+library('stringr')
+library('purrr')
+library('ggplot2')
+library('data.table')
+```
+
+```{r function_ordering}
+ordering <- function(to_order, order_vector, fromLast = TRUE){
+  order = unlist(sapply(order_vector, 
+                        function(x){unique(str_subset(to_order, 
+                                                      pattern = paste(x)))}))
+  order_missing = unique(to_order[!to_order %in% order])
+  unique(c(order, order_missing), fromLast = fromLast)
+}
+```
+
+```{r load_data}
+pir.info <- read.delim('Pchabaudi_pir_info.txt', sep = '\t')
+```
+
+```{r read_blast_results}
+
+blast_output_file.list <- list(
+  list(blast_output_file =  '/camp/lab/langhornej/working/HPC/littlet/tl21-01_testingTrinityChab24h/blast_pirDatabase/scspades/scspades_SBPrMT-mR-rRNAdep/scspades_SBPrMT-mR-rRNAdep_blastn.outfmt6'),
+  list(blast_output_file = c('/camp/lab/langhornej/working/HPC/littlet/tl21-01_testingTrinityChab24h/blast_pirDatabase/Trinity/trinitySBPrMT-mR-rRNAdep_rep220125_blastn/trinitySBPrMT-mR-rRNAdep_rep220125_blastn.outfmt6')),
+  list(blast_output_file = c('/camp/lab/langhornej/working/HPC/littlet/tl21-01_testingTrinityChab24h/blast_pirDatabase/rnaspades/rnaspades_SBPrMT-mR-rRNAdep/rnaspades_SBPrMT-mR-rRNAdep_blastn.outfmt6'))
+)
+
+cvrg_sequence <- seq(0,100,by = 2)
+
+coverage.list <- lapply(blast_output_file.list, 
+       function(blasts_element){
+         
+         blast_output_file <- blasts_element$blast_output_file
+         
+         #Set a filter for bp length to assume is a valid match
+         filter_nident <- 100
+         
+         outfmt6_headers <- 
+           'qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs qcovhsp slen nident' %>% 
+           strsplit(split = ' ') %>% 
+           unlist
+         
+         blast <- read.table(blast_output_file,
+                             col.names = outfmt6_headers) %>% 
+           mutate(geneid = str_extract(sseqid, 
+                                       pattern = '(?<=gene=).+(?=___or)'),
+                  scovhsp = round( (nident/slen * 100), digits = 2)
+           ) %>% 
+           filter(nident > filter_nident)
+         
+         transcripts_covered_by_denovo_diffcov <- lapply(cvrg_sequence,
+                                                         function(covrg) {
+                                                           blast %>% 
+                                                             group_by(sseqid) %>% 
+                                                             filter(scovhsp >= covrg) %>%
+                                                             .$geneid %>% unique %>% length
+                                                         })
+         
+         # names(transcripts_covered_by_denovo_diffcov) <- cvrg_sequence
+         return(transcripts_covered_by_denovo_diffcov)
+       })
+names(coverage.list) <- c('scspades', 'trinity', 'rnaspades')
+
+cvrg.df <- t(do.call(rbind.data.frame, coverage.list))
+rownames(cvrg.df) <- cvrg_sequence
+cvrg.df <- melt(cvrg.df, 
+                # variable.name = c('coverage', 'assembler'),
+                value.name = c('number_known'))
+
+ggplot(data = cvrg.df, 
+       mapping = aes(x = Var1, 
+                     y = number_known, 
+                     col = Var2)) +
+  xlab('Percentage of coverage by individual transcripts') +
+  ylab('Number of known transcripts covered') +
+  geom_point() +
+  theme_bw() +
+  guides(col=guide_legend(title="Assembler"))
+```
