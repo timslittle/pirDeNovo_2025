@@ -451,6 +451,84 @@ ggplot(transcriptCvrg.df, aes(x = assembler,
 
 ```
 
+```{r uniq_transcripts}
+
+transcriptCvrg.df <- lapply(names(sample_blast.list),
+       function(sample) {
+         assembly_blast.list <- getElement(sample_blast.list, sample)
+         lapply(names(assembly_blast.list), function(assembler) {
+           assembly_df <- getElement(assembly_blast.list, assembler)
+           transcripts_df <- assembly_df$transcripts_covered_by_denovo_df %>% 
+             filter(scovhsp >= 95) %>% 
+             mutate(assembler = assembler,
+                    sample = sample) %>%
+             group_by(assembler, sample) %>% 
+             summarise(num_transcripts = n_distinct(sseqid),
+                       num_deNovo = length(qseqid),
+                       med_mismatch = median(mismatch),
+                       med_gap = median(gapopen),
+                       min_scovhsp = min(qcovhsp),
+                       max_scovhsp = max(qcovhsp))
+           if(nrow(transcripts_df) == 0) {
+             transcripts_df <- data.frame('assembler' = assembler,
+                                          'sample' = sample,
+                                          'num_transcripts' = 0,
+                                          'num_deNovo' = 0)
+           }
+           return(transcripts_df)
+         })
+       }) %>% bind_rows
+
+```
+
+
+```{r evigene_v_rest}
+evigene_v_rest <- lapply(names(sample_blast.list),
+                         function(sample) {
+                           assembly_blast.list <- getElement(sample_blast.list, sample)
+                           lapply(c('evigene','rest'), 
+                                  function(assembler) {
+                                    if(assembler == 'evigene'){
+                                      assembly_df <- getElement(assembly_blast.list, 
+                                                                assembler)$transcripts_covered_by_denovo_df
+                                      
+                                    } else {
+                                      assembly_df <- bind_rows(lapply(assembly_blast.list[!names(assembly_blast.list) %in% 
+                                                                                            'evigene'], 
+                                                                      getElement, 
+                                                                      'transcripts_covered_by_denovo_df'))
+                                    }
+                                    
+                                    transcripts_df <- assembly_df %>% 
+                                      filter(scovhsp >= 95) %>% 
+                                      mutate(assembler = assembler,
+                                             sample = sample) %>%
+                                      group_by(assembler, sample) %>% 
+                                      summarise(num_transcripts = n_distinct(sseqid),
+                                                num_deNovo = length(qseqid),
+                                                med_mismatch = median(mismatch),
+                                                med_gap = median(gapopen),
+                                                min_scovhsp = min(qcovhsp),
+                                                max_scovhsp = max(qcovhsp))
+                                    if(nrow(transcripts_df) == 0) {
+                                      transcripts_df <- data.frame('assembler' = assembler,
+                                                                   'sample' = sample,
+                                                                   'num_transcripts' = 0,
+                                                                   'num_deNovo' = 0)
+                                    }
+                                    return(transcripts_df)
+                                  })
+                         }) %>% bind_rows
+
+ggplot(evigene_v_rest, aes(x = assembler, 
+                              y = num_transcripts)) +
+  geom_boxplot() +
+  geom_point(aes(col = sample)) +
+  geom_line(aes(col = sample, group = sample)) +
+  theme_classic() +
+  theme(legend.position = 'none')
+```
+
 
 ```{r data_to_save}
 number_transcripts <- system(paste0('cat ',
