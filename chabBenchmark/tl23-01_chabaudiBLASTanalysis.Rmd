@@ -453,7 +453,7 @@ ggplot(transcriptCvrg.df, aes(x = assembler,
 
 ```{r uniq_transcripts}
 
-transcriptCvrg.df <- lapply(names(sample_blast.list),
+transcripts.df <- lapply(names(sample_blast.list),
        function(sample) {
          assembly_blast.list <- getElement(sample_blast.list, sample)
          lapply(names(assembly_blast.list), function(assembler) {
@@ -462,25 +462,23 @@ transcriptCvrg.df <- lapply(names(sample_blast.list),
              filter(scovhsp >= 95) %>% 
              mutate(assembler = assembler,
                     sample = sample) %>%
-             group_by(assembler, sample) %>% 
-             summarise(num_transcripts = n_distinct(sseqid),
-                       num_deNovo = length(qseqid),
-                       med_mismatch = median(mismatch),
-                       med_gap = median(gapopen),
-                       min_scovhsp = min(qcovhsp),
-                       max_scovhsp = max(qcovhsp))
-           if(nrow(transcripts_df) == 0) {
-             transcripts_df <- data.frame('assembler' = assembler,
-                                          'sample' = sample,
-                                          'num_transcripts' = 0,
-                                          'num_deNovo' = 0)
-           }
+             group_by(assembler, sample)
            return(transcripts_df)
          })
        }) %>% bind_rows
 
+unique(data.table(transcripts.df), by = c("sample","sseqid")) %>% 
+  select(qseqid, sseqid, assembler, sample, everything()) %>% 
+  # filter(assembler != 'evigene') %>% 
+  arrange(sseqid, sample)
+
+filter(transcripts.df, sseqid == 'PCHAS_0200005.1') %>% 
+  select(qseqid, sseqid, assembler, sample, everything()) %>% 
+  arrange(sample)
+
 ```
 
+'PCHAS_0213821' only matched by spadesRNA transcripts, 'PCHAS_1200500' only by spadesRNA/SC.
 
 ```{r evigene_v_rest}
 evigene_v_rest <- lapply(names(sample_blast.list),
