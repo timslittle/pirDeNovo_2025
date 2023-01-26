@@ -160,40 +160,6 @@ assembler_names <- unique(str_extract(blast_files,
 # all(blast$scovs >= blast$scovhsp)
 ```
 
-# Number of hits for each de novo transcript with a BLAST hit.
-
-Are there many de novo transcripts which match multiple different known transcripts? Are most of them unique?
-
-```{r number_of_hits_per_deNovoTranscript}
-# blast %>% 
-#   group_by(qseqid) %>% 
-#   summarise(num = n_distinct(geneid)) %>% 
-#   .$num %>% 
-#   hist(main = 'Histogram of BLAST hits per de novo transcript (50 max)',
-#        breaks = 50)
-```
-
-#Genes with the most number of uniquely mapping de novo transcripts.
-
-```{r number_of_uniq_transcripts_per_gene}
-# blast %>% 
-#   filter(num_genes_match== 1) %>% 
-#   group_by(geneid) %>% 
-#   summarise(num_of_uniq_deNovoTranscripts = n_distinct(qseqid),
-#             max_id = max(pident),
-#             min_id = min(pident),
-#             max_nident = max(nident),
-#             min_nident = min(nident),
-#             max_gap = max(gapopen),
-#             min_gap = min(gapopen),
-#             max_qcovh = max(qcovhsp),
-#             min_qcovh = min(qcovhsp),
-#             max_scovh = max(scovhsp),
-#             min_scovh = min(scovhsp)) %>% 
-#   arrange(desc(num_of_uniq_deNovoTranscripts)) %>% 
-#   kbl() %>% kable_styling() %>% scroll_box(width = "100%", height = "400px")
-```
-
 # Coverage of the subject (known transcripts) and query (assembled de novo transcripts) sequences. 
 
 Using only the de novo transcripts that uniquely match one known pir transcript.
@@ -255,7 +221,7 @@ Showing the BLAST alignments of these >=95% coverage de novo transcripts in a gr
 The "n =" number after the transcript name shows how many other BLAST hits the de novo transcript had in total.
 Size of each point shows the length of the alignment.
 
-Evigene appears to have few possible chimeras, is it removing them? Do the hits to ancestral still remain?
+Evigene appears to have few possible chimeras, is it removing them? Do the hits to ancestral still remain? Is this because it's matched to CDS instead?
 
 ```{r sample_assembly_list}
 sample_blast.list <- lapply(sample_names, 
@@ -360,7 +326,7 @@ transcriptCvrg.df <- lapply(names(sample_blast.list),
 # 
 # boxplot(transcriptCvrg.df$num_transcripts ~ transcriptCvrg.df$assembler)
 
-ggplot(transcriptCvrg.df, aes(x = assembler, 
+gplot <- ggplot(transcriptCvrg.df, aes(x = assembler, 
                               y = num_transcripts,
                               col = assembler)) +
   geom_boxplot() +
@@ -369,6 +335,9 @@ ggplot(transcriptCvrg.df, aes(x = assembler,
   xlab('Method of transcriptome assembly/meta-assembly') +
   ylab('Number of known transcripts matched') +
   facet_grid(~ threshold)
+
+ggsave(filename = '../../plots/chabaudi_numTranscriptsPerAssembByCvrg.pdf',
+       plot = gplot)
 
 ```
 
