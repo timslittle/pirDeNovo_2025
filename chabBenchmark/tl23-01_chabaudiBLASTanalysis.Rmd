@@ -50,6 +50,8 @@ library('kableExtra')
 library('plotly')
 # library('seqinr')
 library('rmarkdown')
+library('data.table')
+library('xlsx')
 ```
 
 ```{r function_ordering}
@@ -473,10 +475,20 @@ blast_hits.df <- lapply(names(sample_blast.list),
                                      uniq_id = paste(qseqid, sseqid, sample, 
                                                      collapse = '_')) %>% 
                             group_by(sample, assembler) %>% 
-                              select(qseqid, sseqid, assembler, sample, everything())
+                              select(qseqid, sseqid, assembler, sample, everything(), -uniq_id)
                             return(transcripts_df)
                           })
        }) %>% bind_rows
+
+write.xlsx2(
+  file = '../../supp_files/suppfile_blast_hits.xlsx',
+  x = blast_hits.df
+)
+
+write_csv2(
+  path = '../../supp_files/suppfile_blast_hits.csv',
+  x = blast_hits.df
+)
 
 ```
 
