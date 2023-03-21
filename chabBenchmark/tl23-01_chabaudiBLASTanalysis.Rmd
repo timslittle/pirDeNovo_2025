@@ -181,10 +181,10 @@ mutate(blast, sample = paste(sample_name, assembler_name, cdhit_thresh, sep = '_
 #   str_replace_all(pattern = '#', replacement = '_') %>% 
 #   str_remove_all(pattern = 'chabaudi_')
 # 
-# sample_names <- unique(str_extract(blast_files, 
-#                             pattern = '(?<=\\/)21659_8.[[:digit:]]{1,2}')) %>% 
-#   str_replace_all(pattern = '#', replacement = '_') %>% 
-#   str_remove_all(pattern = 'chabaudi_')
+sample_names <- unique(str_extract(blast_files,
+                            pattern = '(?<=\\/)21659_8.[[:digit:]]{1,2}')) %>%
+  str_replace_all(pattern = '#', replacement = '_') %>%
+  str_remove_all(pattern = 'chabaudi_')
 # 
 # assembler_names <- unique(str_extract(blast_files, 
 #                             pattern = 'spadesSC|spadesRNA|trinity|evigene'))
@@ -255,19 +255,19 @@ Size of each point shows the length of the alignment.
 Evigene appears to have few possible chimeras, is it removing them? Do the hits to ancestral still remain? Is this because it's matched to CDS instead?
 
 ```{r sample_assembly_list}
-# sample_blast.list <- lapply(sample_names, 
-#                             function(sample){
-#                               assembler.list <- lapply(c('evigene', 'spadesRNA', 'spadesSC', 'trinity'), 
-#                                                        function(assembler){
-#                                                          getElement(transcripts_covered_by_denovo, 
-#                                                                     str_subset(names(transcripts_covered_by_denovo),
-#                                                                                 pattern = paste0(sample, '_(.+|)', assembler))
-#                                                          )
-#                                                        })
-#                               names(assembler.list) <- c('evigene', 'spadesRNA', 'spadesSC', 'trinity')
-#                               return(assembler.list)
-#                             })
-# names(sample_blast.list) <- sample_names
+sample_blast.list <- lapply(sample_names,
+                            function(sample){
+                              assembler.list <- lapply(c('evigene', 'spadesRNA', 'spadesSC', 'trinity'),
+                                                       function(assembler){
+                                                         getElement(transcripts_covered_by_denovo,
+                                                                    str_subset(names(transcripts_covered_by_denovo),
+                                                                                pattern = paste0(sample, '_(.+|)', assembler))
+                                                         )
+                                                       })
+                              names(assembler.list) <- c('evigene', 'spadesRNA', 'spadesSC', 'trinity')
+                              return(assembler.list)
+                            })
+names(sample_blast.list) <- sample_names
 ```
 # Transcripts matched by percentage coverage.
 
