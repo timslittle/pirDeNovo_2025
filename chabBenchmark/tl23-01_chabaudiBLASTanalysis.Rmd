@@ -41,7 +41,7 @@ options(scipen = 999) # Means that numbers are displayed normally not as 1e6 (10
 # Load the required packages
 library('readr')
 library('dplyr', 
-        # lib.loc = "/camp/home/littlet/R/x86_64-pc-linux-gnu-library/4.0"
+        # lib.loc = "/nemo/home/littlet/R/x86_64-pc-linux-gnu-library/4.0"
         )
 library('stringr')
 library('purrr')
@@ -122,52 +122,57 @@ blast_files <- c(
              pattern = "evigene",
              full.names = TRUE)
 )
+# 
+# blast <- lapply(blast_files, 
+#                 function(blast_output_file){
+#                   
+#                   blast_name <- str_extract(blast_output_file, 
+#                                             pattern = '(?<=\\/)21659_.+(?=(2pir|_blast))') %>% 
+#                     str_replace_all(pattern = '#', replacement = '_') %>% 
+#                     str_remove_all(pattern = 'chabaudi_')
+#                   
+#                   sample_name <- str_extract(blast_output_file, 
+#                                              pattern = '(?<=\\/)21659_8.[[:digit:]]{1,2}') %>% 
+#                     str_replace_all(pattern = '#', replacement = '_') %>% 
+#                     str_remove_all(pattern = 'chabaudi_')
+#                   
+#                   assembler_name <- str_extract(blast_output_file, 
+#                             pattern = 'spadesSC|spadesRNA|trinity|evigene|multiass')
+#                   
+#                   cdhit_thresh <- str_extract(blast_output_file, 
+#                                                            pattern = 'cdhit(|est)[[:digit:]]{2}') %>% 
+#                     str_replace(pattern = 'cdhitest', replacement = 'cdhit')
+#                   
+#                   read.table(blast_output_file,
+#                              col.names = outfmt6_headers) %>% 
+#                     mutate(geneid = str_extract(sseqid, 
+#                                                 pattern = '.+(?=\\.)'),
+#                            # sseqid = unlist(
+#                            #   lapply(
+#                            #     str_extract_all(sseqid, 
+#                            #                     pattern = '.+(?=\\.)'), 
+#                            #     paste, 
+#                            #     collapse = '_')
+#                            # ),
+#                            scovhsp = round( (nident/slen * 100), digits = 2),
+#                            scovs = round(((abs(send - sstart) + 1)/slen *100), digits = 2),
+#                            evalue = format(evalue, scientific = TRUE),
+#                            blast_name = blast_name,
+#                            sample_name = sample_name,
+#                            assembler_name = assembler_name,
+#                            cdhit_thresh = cdhit_thresh
+#                     ) %>% 
+#                     # Filter for minimum identity and pir gene name.
+#                     filter(nident > filter_nident,
+#                            geneid %in% pir.info$Gene.ID) %>%
+#                     group_by(qseqid) %>% 
+#                     mutate(num_genes_match =  dplyr::n_distinct(geneid))
+#                 }) %>% dplyr::bind_rows()
+# 
+# write_csv(blast,
+#           path = '../../blast/chabaudi_blastp_results.csv')
 
-blast <- lapply(blast_files, 
-                function(blast_output_file){
-                  
-                  blast_name <- str_extract(blast_output_file, 
-                                            pattern = '(?<=\\/)21659_.+(?=(2pir|_blast))') %>% 
-                    str_replace_all(pattern = '#', replacement = '_') %>% 
-                    str_remove_all(pattern = 'chabaudi_')
-                  
-                  sample_name <- str_extract(blast_output_file, 
-                                             pattern = '(?<=\\/)21659_8.[[:digit:]]{1,2}') %>% 
-                    str_replace_all(pattern = '#', replacement = '_') %>% 
-                    str_remove_all(pattern = 'chabaudi_')
-                  
-                  assembler_name <- str_extract(blast_output_file, 
-                            pattern = 'spadesSC|spadesRNA|trinity|evigene|multiass')
-                  
-                  cdhit_thresh <- str_extract(blast_output_file, 
-                                                           pattern = 'cdhit(|est)[[:digit:]]{2}') %>% 
-                    str_replace(pattern = 'cdhitest', replacement = 'cdhit')
-                  
-                  read.table(blast_output_file,
-                             col.names = outfmt6_headers) %>% 
-                    mutate(geneid = str_extract(sseqid, 
-                                                pattern = '.+(?=\\.)'),
-                           # sseqid = unlist(
-                           #   lapply(
-                           #     str_extract_all(sseqid, 
-                           #                     pattern = '.+(?=\\.)'), 
-                           #     paste, 
-                           #     collapse = '_')
-                           # ),
-                           scovhsp = round( (nident/slen * 100), digits = 2),
-                           scovs = round(((abs(send - sstart) + 1)/slen *100), digits = 2),
-                           evalue = format(evalue, scientific = TRUE),
-                           blast_name = blast_name,
-                           sample_name = sample_name,
-                           assembler_name = assembler_name,
-                           cdhit_thresh = cdhit_thresh
-                    ) %>% 
-                    # Filter for minimum identity and pir gene name.
-                    filter(nident > filter_nident,
-                           geneid %in% pir.info$Gene.ID) %>%
-                    group_by(qseqid) %>% 
-                    mutate(num_genes_match =  dplyr::n_distinct(geneid))
-                }) %>% dplyr::bind_rows()
+blast <- read_csv('../../blast/chabaudi_blastp_results.csv')
 
 mutate(blast, sample = paste(sample_name, assembler_name, cdhit_thresh, sep = '_')) %>% .$sample %>% unique %>% sort %>% length() == 216
 
