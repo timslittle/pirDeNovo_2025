@@ -1,0 +1,487 @@
+---
+title: "tl22-01_VvxTPMover1"
+output: 
+  html_document:
+    theme: cosmo
+    code_download: true
+    toc: true
+    number_sections: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+---
+
+# Intro
+
+This script analyses the results of a _de novo_ assembly of Plasmodium vivax RNAseq data.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, 
+                      results = TRUE, 
+                      message = FALSE, 
+                      warning = FALSE)
+options(scipen = 999) 
+# Means that numbers are displayed normally not as 1e6 (1000000)
+```
+
+```{r loading_packages, include = FALSE, message = FALSE}
+# Load the required packages
+library('readr')
+library('dplyr', 
+        lib.loc = "/camp/home/littlet/R/x86_64-pc-linux-gnu-library/4.0")
+library('stringr')
+library('purrr')
+library('kableExtra')
+library('plotly')
+library('rmarkdown')
+library('seqinr')
+
+safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
+                             "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888")
+global_save_var <- FALSE
+```
+
+```{r function_ordering}
+ordering <- function(to_order, order_vector, fromLast = TRUE){
+  order = unlist(sapply(order_vector, 
+                        function(x){unique(str_subset(to_order, 
+                                                      pattern = paste(x)))}))
+  order_missing = unique(to_order[!to_order %in% order])
+  unique(c(order, order_missing), fromLast = fromLast)
+}
+```
+
+```{r function_uniquify}
+#Make unique identifiers from a vector of names by appending '_X' where X is the number of the 'replicate'.
+uniquify <- function(vector_names, first_one = TRUE){
+  new_vector <- c()
+  df_num <- data.frame(names = unique(vector_names), rep = 1)
+  if(first_one){
+    duplicated_names <- unique(vector_names[duplicated(vector_names)])
+  }else{
+    duplicated_names <- c()
+  }
+  for(i in 1:length(vector_names)){
+    if(vector_names[i] %in% duplicated_names|!first_one){
+      name <- paste(vector_names[i],
+                    df_num$rep[match(vector_names[i], df_num$names)],
+                    sep = '_')
+      #Increase rep counter
+      df_num$rep[match(vector_names[i], df_num$names)] <- df_num$rep[match(vector_names[i], df_num$names)] + 1
+      new_vector[i] <- name
+    }else{
+      new_vector[i] <- vector_names[i]
+    }
+  }
+  new_vector
+}
+```
+
+```{r read_200aa_pirs}
+G18G19_hmmerVir200aa.fa <- read.fasta('/camp/lab/langhornej/working/HPC/littlet/tl22-01_vivaxDeNovo/hmmer/scspades/G18_B20_C19_Z16_M19_R20_K1719_G19-cat/G18_B20_C19_Z16_M19_R20_K1719_G19-cat_scspades_0.95cdhitest_hmmerPfam-PlasmodiumVir_200aa.fasta')
+
+#Need to read in the >200aa ORF length  pirs
+pir_list.vec <- str_extract(
+  names(G18G19_hmmerVir200aa.fa),
+  pattern = 'NODE.+(?=_[[:digit:]])'
+)
+```
+
+```{r load_salmon}
+#Get the full file paths of the salmon quant.sf files.
+quant_files <- list.files(path = "/camp/lab/langhornej/working/HPC/littlet/tl22-01_vivaxDeNovo/salmon/all_files",
+                          recursive = TRUE,
+                          pattern = 'quant.sf',
+                          full.names = TRUE)
+
+#Load the samplesheet.txt file of metadata, add new column for salmon files
+samplesheet <- read.delim("/camp/lab/langhornej/working/HPC/littlet/tl22-01_vivaxDeNovo/samplesheet.txt") %>% 
+  mutate(salmon_quant = '')
+
+#Make a table of the files and the sample metadata from samplesheet.txt
+# for loop over all the quant_files that exist
+for(quant_name in quant_files){
+  #Looking for the sample prefix in the file path between 'all_files' and '{prefix}_quant'
+  prefix <- str_extract(quant_name, 
+                        pattern = '(?<=\\/all_files/).+(?=/.+_quant)')
+  if(nrow(samplesheet[grep(samplesheet$prefix, 
+                   pattern = prefix),]) > 1){
+                     stop(paste0(prefix,
+                                 " matches more than one row of the samplesheet"))
+                   }
+  samplesheet[grep(samplesheet$prefix, 
+                   pattern = prefix),'salmon_quant'] <- quant_name
+}
+
+sum(grepl(samplesheet[,'salmon_quant'], pattern = 'camp')) == 247
+```
+
+```{r list_expt_quant}
+expt_quant <- lapply(unique(samplesheet$Experiment),
+                     #For each experiment name
+                     function(expt){
+                       print(paste0('Starting ', expt))
+                       #Get the experimental metadata by subsetting
+                       expt_data <- samplesheet[samplesheet$Experiment == expt,]
+                       if(!sum(grepl(expt_data$assembly, pattern = '.')) == 0){
+                         #If sum of grepping for any character is not zero, do the analysis 
+                         # i.e there are assembly names and probably assemblies/quant files
+                         # For each individual assembly 
+                         # (we can bind rows for samples that use the same assembly)
+                         assembly_quants <- lapply(unique(expt_data$assembly), 
+                                                   function(assembly){
+                                                     #Get the prefix(es) that were quantified against this assembly
+                                                     prefix <- expt_data[expt_data$assembly == assembly, 
+                                                                         'prefix']
+                                                     #Get the quant file name(s) and read it in
+                                                     quant_file <- expt_data[expt_data$prefix %in% prefix,
+                                                                             'salmon_quant']
+                                                     
+                                                     #If the file name isn't zero length (i.e. there is no name)
+                                                     if(!length(quant_file) == 0){
+                                                       #If length is one then we can make the quant file for just one sample 
+                                                       if(length(prefix) == 1){
+                                                         quant <- read.delim(quant_file)
+                                                         #Subset the Name and TPM columns and keep it as a data frame (drop = F)
+                                                         quant.df <- quant[,c('Name','TPM'), drop = FALSE]
+                                                         
+                                                         # Give a warning if the TPM values are all zero.
+                                                         if(sum(as.double(quant$TPM)) == 0){
+                                                           #Do not return a quant.df data.frame, making it nothing:
+                                                           quant.df <- ''
+                                                           print(paste0(prefix, 
+                                                                        " associated file has recorded no TPM values"))
+                                                           #empty return to end the lapply for this file
+                                                           return()
+                                                         }
+                                                         
+                                                       } else {
+                                                         #If longer than 1 so there's more than one quant file for this assembly
+                                                         quant.rlist <- lapply(quant_file, read.delim)
+                                                         #Use purrr reduce to bind the df in the list together with inner_join,
+                                                         # combining by the 'Name' column which should be the same throughout.
+                                                         quant.df <- purrr::reduce(quant.rlist, 
+                                                                                   inner_join, 
+                                                                                   by = 'Name')
+                                                         quant.df <- quant.df[grepl(colnames(quant.df), 
+                                                                                    pattern = 'Name|TPM')]
+                                                         
+                                                         # Give a warning if the TPM values are all zero.
+                                                         if(any(sapply(quant.df[grepl(colnames(quant.df), 
+                                                                                      pattern = 'TPM')], 
+                                                                       function(x) sum(as.double(x))) == 0)){
+                                                           print(paste0("At least some of ", 
+                                                                        expt, 
+                                                                        " results have recorded no TPM values"))
+                                                           return()
+                                                         }
+                                                         
+                                                       }
+                                                       
+                                                       #Put the sample name (prefix) in the TPM column
+                                                       colnames(quant.df)[grepl(colnames(quant.df), 
+                                                                                pattern = 'TPM')] <- paste0(prefix,
+                                                                                                            '_TPM')
+                                                       
+                                                       # Mark the pir NODES as such (TRUE in the 'pir' column)
+                                                       quant.df$pir <- quant.df$Name %in% pir_list.vec
+                                                       print(paste0('Number of pirs = ', sum(quant.df$pir)))
+                                                       return(quant.df)
+                                                     }
+                                                   })
+                         
+                         names(assembly_quants) <- str_extract(unique(expt_data$assembly),
+                                                               pattern = '(?<=\\/cdhitest/).+(?=/.+fasta)')
+                         print(paste0('Finished ', expt))
+                         return(assembly_quants)  
+                       }
+                     }
+)
+
+names(expt_quant) <- unique(samplesheet$Experiment)
+```
+
+```{r node-df_tpmvalues}
+
+# Add the TPM values to the node.df dataset alongside a threshold expressed/not expressed
+
+# Get a list of all the de novo transcripts and their max TPM. 
+#  Shouldn't be any with the same name unless by exceptional chance?
+pir_quant <- lapply(names(expt_quant), 
+                     function(expt.name) {
+                       expt.list <- expt_quant[[expt.name]]
+                       # print(names(expt.list))
+                       lapply(names(expt.list), 
+                              function(quant.name) {
+                                quant.df <- expt.list[[quant.name]]
+                                if(!is.null(quant.df)){
+                                  #Melt the dataframe to calculate the max TPM value for each de novo transcript
+                                  # across all samples.
+                                  #This may be faster without melting and using apply.
+                                  filter(quant.df, pir) %>% 
+                                    reshape2::melt(.,
+                                                   id.vars = c('pir','Name'),
+                                                   measure.vars = str_subset(colnames(.), 
+                                                                             pattern = 'TPM'),
+                                                   value.name = 'tpm') %>% 
+                                    group_by(Name, pir) %>% 
+                                    summarise(max_tpm = max(tpm)) %>% 
+                                    mutate(label_no_end = paste(quant.name, Name, sep = '_'),
+                                           expt_assembly = quant.name, 
+                                           expt = expt.name)
+                                }
+                              }) %>% 
+                         bind_rows
+                     }) %>% 
+  bind_rows
+
+# sum(duplicated(pir_quant$Name))
+
+write.csv(pir_quant,
+          'pir_maxTPM.csv')
+
+```
+
+```{r pirRemoved}
+pir_quant %>% 
+  group_by(expt_assembly) %>% 
+  summarise(num_over1TPM = sum(max_tpm >= 1),
+            num_total = n_distinct(Name),
+            perc_over1TPM = round(100*sum(max_tpm >= 1)/n_distinct(Name), digits = 2),
+            med_max_over1tpm = median(max_tpm[max_tpm >= 1])) %>% 
+  arrange(desc(perc_over1TPM))
+```
+
+```{r over1tpm_listFiles}
+#Note that node_tpm.df includes none-quantified genes, like P01/Sal1/Zhu16 and the Rangel genes.
+# Will use over or equal to 1 TPM in at least one sample (max_tpm > 1) as the threshold for active transcription.
+expressed_pirTranscripts <- filter(pir_quant, max_tpm>=1)
+
+paste0('Number of transcribed pirs = ',
+       nrow(expressed_pirTranscripts),
+       ' and number of non-transcribed pirs = ',
+       nrow(pir_quant) - nrow(expressed_pirTranscripts))
+
+names_no_end <- str_remove(names(G18G19_hmmerVir200aa.fa), 
+                           pattern = '_[[:digit:]]{1,2}$')
+
+#These aren't all unique, I guess this doesn't impact anything later.
+
+#Subset the fasta file by the pirs which are actively transcribed.
+# Note that this may be greater than expected due to the fact that there may be multiple pir ORFs for one expressed pir transcript.
+# Also it is smaller than the number of expressed_pirTranscripts because not all of the expressed_pirTranscripts have a >200aa ORF.
+# Note that the pirs are defined as such based on the *_scspades_0.95cdhitest_hmmerPfam-PlasmodiumVir.list files (so before 200aa filtering).
+
+G18G19_hmmerVir200aa_tpmOver1.fa <- G18G19_hmmerVir200aa.fa[
+  names(G18G19_hmmerVir200aa.fa)[names_no_end %in% expressed_pirTranscripts$label_no_end]
+  ]
+
+#Duplicates among these ORFs/transcripts.
+# duplicates <- sapply(expressed_pirTranscripts$label_no_end,
+#        function(x) names(G18G19_hmmerVir200aa.fa)[names_no_end %in% x] )
+# duplicates[lapply(duplicates, length) > 1]
+
+print(paste0('Number of ORFs (>200aa ORF tpm over 1) = ',
+      length(G18G19_hmmerVir200aa_tpmOver1.fa)))
+print(paste0('Number of unique transcripts (>200aa ORF tpm over 1) = ',
+      length(unique(str_extract(names(G18G19_hmmerVir200aa_tpmOver1.fa), 
+                   pattern = '.+(?=_[[:digit:]]$)')))))
+
+table(str_extract(names(G18G19_hmmerVir200aa_tpmOver1.fa), pattern ='.+(?=_NODE)'))
+
+#Save the fasta file of the over 1 TPM pirs.
+# write.fasta(G18G19_hmmerVir200aa_tpmOver1.fa,
+#             names(G18G19_hmmerVir200aa_tpmOver1.fa),
+#             file.out = '/camp/lab/langhornej/working/HPC/littlet/tl22-01_vivaxDeNovo/hmmer/scspades/G18_B20_C19_Z16_M19_R20_K1719_G19-cat/G18_B20_C19_Z16_M19_R20_K1719_G19-cat_scspades_0.95cdhitest_hmmerPfam-PlasmodiumVir_orf200aa_tpmOver1.fasta')
+
+# sum(expressed_pirTranscripts$Name == 'NODE_2407_length_2160_cov_4.64561')
+
+```
+
+The percentage of overall transcripts and pir transcripts transcribed over 1 TPM for each sample.
+
+```{r num_over_1}
+# Count the number/percentage of de novo transcripts with an expression level over 1 TPM
+over1.df <- lapply(names(expt_quant), 
+       function(expt){
+         expt_df.list <- lapply(names(expt_quant[[expt]]), 
+                function(assembly){
+                  if(!is.null(expt_quant[[expt]][[assembly]])){
+                    df <- expt_quant[[expt]][[assembly]]
+                    #reshape2::melt the data frame to put each sample (the measure.vars) on a separate row.
+                    reshape2::melt(df, 
+                         id.vars = c('Name','pir'),
+                         measure.vars = str_subset(colnames(df), 
+                                                   pattern = 'TPM'),
+                         variable.name = 'sample',
+                         value.name = 'tpm') %>% 
+                      mutate(num_transcripts = n_distinct(Name),
+                             num_pirs = n_distinct(Name[pir])) %>% 
+                      group_by(sample, pir, 
+                               num_pirs, num_transcripts
+                      ) %>% 
+                      summarise(over1_perc = unique(round(100*sum(tpm >= 1)/num_transcripts, 
+                                                          digits = 2)),
+                                over1_num = sum(tpm >= 1),
+                                #For the pir percantage if it is over 100% (i.e. when this is
+                                # calculating for all the transcripts total) then make it NA
+                                over1_perc_pirs = ifelse(unique(sum(tpm >= 1)/num_pirs <= 1),
+                                                         round(unique(100*sum(tpm >= 1)/num_pirs),
+                                                               digits = 2),
+                                                         NA),
+                                total = n_distinct(Name)) %>% 
+                      mutate(assembly = paste(assembly))
+                  }
+                })
+         #Add the experiment as a row for binding all these together
+         expt_df <- bind_rows(expt_df.list) %>% 
+           mutate(expt = expt)
+       }) %>% 
+  #bind_rows together across all the experiments and assemblies.
+  bind_rows
+
+```
+
+```{r assembly_info}
+
+assembly_info.df <- read.delim('/camp/lab/langhornej/working/HPC/littlet/tl22-01_vivaxDeNovo/tl22-01_assembly_info.txt') %>% 
+  filter(!grepl(assembly, pattern = '0\\.9c|0\\.99'),
+         !grepl(assembly, pattern = 'SRX5158513_SRR8347514|SRX5158512_SRR8347515'))  
+#Filter out any none-0.95 assembly made. And potential Kim19_A duplicate?
+
+#Order experiments by years
+expt_num.vec <-ordering(unique(assembly_info.df$experiment), 
+                                   order_vector = c(16:22))
+#Get experiment numbers and add '0' to single digit numbers.
+names(expt_num.vec) <-  paste0('E', 
+                              sapply(seq_along(expt_num.vec), function(x){
+                                ifelse(nchar(x)==1, 
+                                       paste0('0', x),
+                                       x)
+                              }))
+
+#Manually add Gunalan19 and _Boonkaew20 (in addition to Guna19 and Boonkaew20)
+expt_num.vec <- c(expt_num.vec, E07 = 'Gunalan19', E08 = '_Boonkaew20')
+
+#Get the relevant info from samplesheet otherwise loads of rows will be duplicated when joining.
+samplesheet_small.df <- mutate(samplesheet, assembly_file = assembly) %>% 
+  select(assembly_file, Cat.Sample.stage.s.) %>% unique
+
+assembly_info_samplesheet.df <- left_join(assembly_info.df, samplesheet_small.df, by = 'assembly_file')
+
+assembly_info_samplesheet.df <- mutate(assembly_info_samplesheet.df,
+                                        experiment_num = names(expt_num.vec)[match(experiment,
+                                                                                  expt_num.vec)])
+
+#Get consistent shapes and colours for the graphs
+
+shapes_val <- 1:length(unique(assembly_info_samplesheet.df$Cat.Sample.stage.s.))
+names(shapes_val) <- unique(assembly_info_samplesheet.df$Cat.Sample.stage.s.)
+
+colours_val <- safe_colorblind_palette[1:length(unique(names(expt_num.vec)))]
+names(colours_val) <- unique(names(expt_num.vec))
+
+expt_num.df <- data.frame(expt = expt_num.vec, 
+                          expt_code = names(expt_num.vec), 
+                          col = c(colours_val,colours_val['E07'],colours_val['E08']))
+
+#Get the stages of the life cycle used for the assembly (altering the Gunalan sample name in over1.df since they do not correspond).
+over1.df$stage <- assembly_info_samplesheet.df$Cat.Sample.stage.s.[
+  match(str_replace(over1.df$assembly, pattern = 'Gunalan19', replacement = 'Guna19'), 
+        str_extract(assembly_info_samplesheet.df$assembly, 
+                    pattern = '.+(?=_scspades_0.95cdhitest)'))
+]
+
+#Get the experiment numbers (altering the Gunalan sample name in over1.df since they do not correspond).
+over1.df$experiment_num <- assembly_info_samplesheet.df$experiment_num[
+  match(str_replace(over1.df$assembly, pattern = 'Gunalan19', replacement = 'Guna19'), 
+        str_extract(assembly_info_samplesheet.df$assembly, 
+                    pattern = '.+(?=_scspades_0.95cdhitest)'))
+]
+
+#Save the colour scheme
+assembly_info_samplesheet.df$expt_colour <- colours_val[match(assembly_info_samplesheet.df$experiment_num,
+                                                  names(colours_val))]
+
+#Save number of pir transcripts over 1 TPM (altering the Gunalan sample name in over1.df since they do not correspond).
+pir_over1.df <- filter(over1.df, pir)  
+
+assembly_info_samplesheet.df$num_mRNA_pir_over200aa_over1TPM <- pir_over1.df$over1_num[
+  match(str_extract(assembly_info_samplesheet.df$assembly, 
+                    pattern = '.+(?=_scspades_0.95cdhitest)'),
+        str_replace(pir_over1.df$assembly, pattern = 'Gunalan19', replacement = 'Guna19'))
+]
+
+# Make NAs zero
+assembly_info_samplesheet.df$num_mRNA_pir_over200aa_over1TPM <- ifelse(
+  is.na(assembly_info_samplesheet.df$num_mRNA_pir_over200aa_over1TPM),
+  0,
+  assembly_info_samplesheet.df$num_mRNA_pir_over200aa_over1TPM 
+)
+
+write.table(assembly_info_samplesheet.df,
+            '/camp/lab/langhornej/working/HPC/littlet/tl22-01_vivaxDeNovo/tl22-01_assembly_info_extra.txt')
+
+```
+
+```{r over1_plots}
+
+(plot <- ggplot(data = filter(over1.df, !pir),
+                aes(x = total, 
+                    y = over1_perc,
+                    col = experiment_num,
+                    shape = stage)) +
+    geom_point(size = 1, stroke = 2, alpha = .75) +
+  scale_shape_manual(values=shapes_val,
+                     name = 'Life cycle stage',
+                     guide = guide_legend(ncol = 2)) +
+  scale_color_manual(values = colours_val[!names(colours_val) %in% 'E10'],
+                     name = 'Experiment',
+                     guide = guide_legend(ncol = 2)) +
+    xlab('Number of assembled transcripts') +
+    ylab('Percentage of transcripts transcribed over 1 TPM') +
+    theme_classic())
+
+if(global_save_var){
+  ggsave(plot = plot,
+         '/camp/lab/langhornej/working/HPC/littlet/tl22-01_vivaxDeNovo/plots/assemblies_numTranscriptsOver1tpm_totalTranscripts.pdf',
+         device = 'pdf',
+         width = 7,
+         height = 5,
+         units = "in")
+}
+
+(plot <- ggplot(data = filter(over1.df, pir),
+       aes(x = total, 
+           y = over1_perc_pirs,
+           col = experiment_num,
+           shape = stage)) +
+    geom_point(size = 1, stroke = 2, alpha = .75) +
+    #Subset the shapes/colours_val since not all the experiments/stages have any predicted pirs and are hence not included.
+    scale_shape_manual(values=shapes_val[
+      names(shapes_val) %in% unique(filter(over1.df, 
+                                           pir)$stage)
+    ],
+    name = 'Life cycle stage',
+    guide = guide_legend(ncol = 2)) +
+    scale_color_manual(values = colours_val[
+      names(colours_val) %in% unique(filter(over1.df, 
+                                            pir)$experiment_num)
+    ],
+    name = 'Experiment',
+    guide = guide_legend(ncol = 2)) +
+   xlab(expression(paste('Number of assembled ',italic(pir),' transcripts'))) +
+   ylab(expression(paste('Percentage of ',italic(pir),'s transcribed over 1 TPM'))) +
+   theme_classic())
+
+if(global_save_var){
+  ggsave(plot = plot,
+         '/camp/lab/langhornej/working/HPC/littlet/tl22-01_vivaxDeNovo/plots/assemblies_numPirOver1tpm_totalTranscripts.pdf',
+         device = 'pdf',
+         width = 7,
+         height = 5,
+         units = "in")
+}
+
+```
+
