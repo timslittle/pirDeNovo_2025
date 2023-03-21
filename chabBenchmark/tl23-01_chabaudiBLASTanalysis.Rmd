@@ -111,12 +111,38 @@ outfmt6_headers <-
   strsplit(split = ' ') %>% 
   unlist
 
-blast_files <- list.files(path = "../../blast/chabaudi/", 
-                          pattern = ".blast",
-                          full.names = TRUE)
+blast_files <- c(
+  list.files(path = "../../blast", 
+             pattern = "blastp.outfmt6",
+             full.names = TRUE),
+  # list.files(path = "../../blast/chabaudi/", 
+  #            pattern = "CDS.blast",
+  #            full.names = TRUE),
+  list.files(path = "../../blast/chabaudi", 
+             pattern = "evigene",
+             full.names = TRUE)
+)
 
 blast <- lapply(blast_files, 
                 function(blast_output_file){
+                  
+                  blast_name <- str_extract(blast_output_file, 
+                                            pattern = '(?<=\\/)21659_.+(?=(2pir|_blast))') %>% 
+                    str_replace_all(pattern = '#', replacement = '_') %>% 
+                    str_remove_all(pattern = 'chabaudi_')
+                  
+                  sample_name <- str_extract(blast_output_file, 
+                                             pattern = '(?<=\\/)21659_8.[[:digit:]]{1,2}') %>% 
+                    str_replace_all(pattern = '#', replacement = '_') %>% 
+                    str_remove_all(pattern = 'chabaudi_')
+                  
+                  assembler_name <- str_extract(blast_output_file, 
+                            pattern = 'spadesSC|spadesRNA|trinity|evigene|multiass')
+                  
+                  cdhit_thresh <- str_extract(blast_output_file, 
+                                                           pattern = 'cdhit(|est)[[:digit:]]{2}') %>% 
+                    str_replace(pattern = 'cdhitest', replacement = 'cdhit')
+                  
                   read.table(blast_output_file,
                              col.names = outfmt6_headers) %>% 
                     mutate(geneid = str_extract(sseqid, 
@@ -130,34 +156,34 @@ blast <- lapply(blast_files,
                            # ),
                            scovhsp = round( (nident/slen * 100), digits = 2),
                            scovs = round(((abs(send - sstart) + 1)/slen *100), digits = 2),
-                           evalue = format(evalue, scientific = TRUE)
+                           evalue = format(evalue, scientific = TRUE),
+                           blast_name = blast_name,
+                           sample_name = sample_name,
+                           assembler_name = assembler_name,
+                           cdhit_thresh = cdhit_thresh
                     ) %>% 
-                    filter(nident > filter_nident) %>%
+                    # Filter for minimum identity and pir gene name.
+                    filter(nident > filter_nident,
+                           geneid %in% pir.info$Gene.ID) %>%
                     group_by(qseqid) %>% 
-                    mutate(num_genes_match = n_distinct(geneid))
-                })
+                    mutate(num_genes_match =  dplyr::n_distinct(geneid))
+                }) %>% dplyr::bind_rows()
 
-names(blast) <- str_extract(blast_files, 
-                            pattern = '(?<=\\/)21659_.+(?=2pir\\.blast)')
+mutate(blast, sample = paste(sample_name, assembler_name, cdhit_thresh, sep = '_')) %>% .$sample %>% unique %>% sort %>% length() == 216
 
-sample_names <- unique(str_extract(blast_files, 
-                            pattern = '(?<=\\/)21659_.+(?=_.+2pir\\.blast)'))
+# names(blast) <- str_extract(blast_files, 
+#                             pattern = '(?<=\\/)21659_.+(?=(2pir|_blastp))') %>% 
+#   str_replace_all(pattern = '#', replacement = '_') %>% 
+#   str_remove_all(pattern = 'chabaudi_')
+# 
+# sample_names <- unique(str_extract(blast_files, 
+#                             pattern = '(?<=\\/)21659_8.[[:digit:]]{1,2}')) %>% 
+#   str_replace_all(pattern = '#', replacement = '_') %>% 
+#   str_remove_all(pattern = 'chabaudi_')
+# 
+# assembler_names <- unique(str_extract(blast_files, 
+#                             pattern = 'spadesSC|spadesRNA|trinity|evigene'))
 
-assembler_names <- unique(str_extract(blast_files, 
-                            pattern = '(?<=\\/21659_8\\#[[:digit:]]{1,2}_).+(?=2pir\\.blast)'))
-
-# Filter for the top hits for each de novo transcript by e-value.
-
-# blast_top <- group_by(blast, qseqid) %>% 
-#   slice_min(evalue, n = 1)
-
-#Filter for the de novo transcripts which only match a single known pir.
-# Also removing idents below 100 because these are probably poor matches.
-
-# blast_uniq <- filter(blast, num_genes_match == 1)
-
-#sanity test
-# all(blast$scovs >= blast$scovhsp)
 ```
 
 # Coverage of the subject (known transcripts) and query (assembled de novo transcripts) sequences. 
@@ -187,34 +213,34 @@ How many of the known transcripts are covered >=95% of their sequence by de novo
 num_match_all and num_match_95 show how many other known transcripts these de novo transcripts match in total or >=95% respectively.
 
 ```{r transcripts_covering_most_of_known_transcripts}
-transcripts_covered_by_denovo <- lapply(blast, function(blast_df){
-  transcripts_covered_by_denovo_df <- blast_df %>% 
-    group_by(qseqid) %>%
-    mutate(num_match_all = n_distinct(sseqid)) %>%
-    group_by(sseqid) %>% 
-    filter(scovhsp >= 95) %>% 
-    group_by(qseqid) %>%
-    mutate(num_match_95 = n_distinct(sseqid)) %>% 
-    arrange(geneid)
-  
-  transcripts_covered_by_denovo_75 <- blast_df %>% 
-  group_by(qseqid) %>%
-  mutate(num_match_all = n_distinct(sseqid)) %>%
-  group_by(sseqid) %>% 
-  filter(scovhsp >= 75) %>% 
-  group_by(qseqid) %>%
-  mutate(num_match_95 = n_distinct(sseqid)) %>% 
-  arrange(geneid)
-  
-  possible_chimeras <- transcripts_covered_by_denovo_df %>% 
-  filter(qcovhsp < 50)
-  
-  return(list(blast_df = blast_df,
-              transcripts_covered_by_denovo_df = transcripts_covered_by_denovo_df,
-              possible_chimeras = possible_chimeras,
-              transcripts_covered_by_denovo_75 = transcripts_covered_by_denovo_75
-  ))
-})
+# transcripts_covered_by_denovo <- lapply(blast, function(blast_df){
+#   transcripts_covered_by_denovo_df <- blast_df %>% 
+#     group_by(qseqid) %>%
+#     mutate(num_match_all = n_distinct(sseqid)) %>%
+#     group_by(sseqid) %>% 
+#     filter(scovhsp >= 95) %>% 
+#     group_by(qseqid) %>%
+#     mutate(num_match_95 = n_distinct(sseqid)) %>% 
+#     arrange(geneid)
+#   
+#   transcripts_covered_by_denovo_75 <- blast_df %>% 
+#   group_by(qseqid) %>%
+#   mutate(num_match_all = n_distinct(sseqid)) %>%
+#   group_by(sseqid) %>% 
+#   filter(scovhsp >= 75) %>% 
+#   group_by(qseqid) %>%
+#   mutate(num_match_95 = n_distinct(sseqid)) %>% 
+#   arrange(geneid)
+#   
+#   possible_chimeras <- transcripts_covered_by_denovo_df %>% 
+#   filter(qcovhsp < 50)
+#   
+#   return(list(blast_df = blast_df,
+#               transcripts_covered_by_denovo_df = transcripts_covered_by_denovo_df,
+#               possible_chimeras = possible_chimeras,
+#               transcripts_covered_by_denovo_75 = transcripts_covered_by_denovo_75
+#   ))
+# })
 ```
 
 Showing the BLAST alignments of these >=95% coverage de novo transcripts in a graph, and all the matches they have. 
@@ -224,122 +250,164 @@ Size of each point shows the length of the alignment.
 Evigene appears to have few possible chimeras, is it removing them? Do the hits to ancestral still remain? Is this because it's matched to CDS instead?
 
 ```{r sample_assembly_list}
-sample_blast.list <- lapply(sample_names, 
-                            function(sample){
-                              assembler.list <- lapply(c('evigene', 'spadesRNA', 'spadesSC', 'trinity'), 
-                                                       function(assembler){
-                                                         getElement(transcripts_covered_by_denovo, 
-                                                                    paste0(sample, '_', assembler))
-                                                       })
-                              names(assembler.list) <- c('evigene', 'spadesRNA', 'spadesSC', 'trinity')
-                              return(assembler.list)
-                            })
-names(sample_blast.list) <- sample_names
+# sample_blast.list <- lapply(sample_names, 
+#                             function(sample){
+#                               assembler.list <- lapply(c('evigene', 'spadesRNA', 'spadesSC', 'trinity'), 
+#                                                        function(assembler){
+#                                                          getElement(transcripts_covered_by_denovo, 
+#                                                                     str_subset(names(transcripts_covered_by_denovo),
+#                                                                                 pattern = paste0(sample, '_(.+|)', assembler))
+#                                                          )
+#                                                        })
+#                               names(assembler.list) <- c('evigene', 'spadesRNA', 'spadesSC', 'trinity')
+#                               return(assembler.list)
+#                             })
+# names(sample_blast.list) <- sample_names
 ```
-
 # Transcripts matched by percentage coverage.
 
 ```{r transcript_coverage_by_percentage}
-lapply(sample_names, 
-       function(sample){
-         cvrg_df <- lapply(c('evigene', 'spadesRNA', 'spadesSC', 'trinity'), 
-                           function(assembler){
-                             blast <- getElement(
-                               getElement(sample_blast.list, 
-                                          sample),
-                               assembler)
-                             transcripts_covered_by_denovo_diffcov <- lapply(
-                               seq(0,100,by = 5),
-                               function(covrg) {
-                                 lapply(c(100, 90, 75),
-                                        function(percident){
-                                          num <- blast$blast_df %>% 
-                                            group_by(sseqid) %>% 
-                                            filter(scovhsp >= covrg, 
-                                                   pident >= percident) %>%
-                                            .$geneid %>% unique %>% length
-                                          data.frame(covrg = covrg,
-                                                     pident = percident,
-                                                     num_transcripts = num,
-                                                     sample = sample,
-                                                     assembler = assembler)
-                                        })
-                               }) %>% 
-                               bind_rows
-                           }) %>% 
-           bind_rows
-         
-         cols_pident <- as.factor(cvrg_df$pident) %>% 
-           as.integer()
-         cols_plot <- hcl.colors(length(unique(cols_pident)), palette = "Spectral")[cols_pident]
-         
-         ggplot(data = cvrg_df) +
-           geom_line(aes(y = num_transcripts, 
-                         x = covrg,
-                         linetype = as.factor(pident),
-                         col = assembler),
+
+blast_forcov.df <- blast %>%
+  group_by(geneid, blast_name) %>%
+  #Choosing this by bitscore scovhsp or pident may be important
+  slice_max(order_by = bitscore, n = 1, with_ties = FALSE) %>%
+  # #Only keep the row with the lowest mismatches (again, may be important whether this or gaps are chosen).
+  # slice_min(order_by = mismatch, n = 1) %>% 
+  group_by(blast_name,
+           sample_name, assembler_name,
+           cdhit_thresh) 
+
+cvrg_df <- lapply( seq(5,100,by = 5),
+  function(cvrg) {
+    lapply(c(100, 90, 75),
+           function(percident){
+             summarise(blast_forcov.df,
+                       num_matches = n_distinct(sseqid[scovhsp >= cvrg & pident >= percident]),
+                       gapopens = median(gapopen),
+                       mismatches = median(mismatch)) %>% 
+               mutate(cvrg = cvrg, percident = percident)
+           })
+  }) %>% bind_rows %>% arrange(desc(num_matches))
+
+cvrg_df %>% filter(sample_name == '21659_8_5', cvrg == 75, percident == 75)
+```
+
+```{r percident_graph}
+cols_pident <- as.factor(cvrg_df$pident) %>% 
+  as.integer()
+cols_plot <- hcl.colors(length(unique(cols_pident)), palette = "Spectral")[cols_pident]
+
+lapply(cvrg_df$sample_name[1], 
+       function(sample_name.str){
+         ggplot(data = filter(cvrg_df, 
+                              sample_name == sample_name.str,
+                              is.na(cdhit_thresh),
+                              cvrg > 50)) +
+           geom_line(aes(y = num_matches, 
+                         x = cvrg,
+                         linetype = as.factor(percident),
+                         col = assembler_name),
                      size = .75) +
            scale_linetype_manual(values = c('100' = 2, '90' = 1, '75' = 4), 
                                  name = '% identity') +
            theme_classic() +
            ylab('Number of known transcripts covered') +
            xlab('Percentage of coverage by individual transcripts') +
-           ggtitle(sample)
-       })
+           facet_grid(rows = vars(assembler_name)) +
+           ggtitle(sample_name.str)
+})
 ```
 
+Something is wrong with the below, it's producing weird numbers for the multiass.
+
 ```{r cvrg_stats}
+#define custom function to calculate min
+custom_min <- function(x) {if (length(x)>0) min(x) else NA}
+custom_max <- function(x) {if (length(x)>0) max(x) else NA}
 
-transcriptCvrg.df <- lapply(names(sample_blast.list),
-                            function(sample) {
-                              assembly_blast.list <- getElement(sample_blast.list, sample)
-                              lapply(names(assembly_blast.list), function(assembler) {
-                                assembly_df <- getElement(assembly_blast.list, assembler)
-                                transcripts_df <- lapply(c(50,75,90,95,100), 
-                                       function(threshold){
-                                         transcripts_df <- assembly_df$blast_df %>% 
-                                           filter(scovhsp >= threshold,
-                                                  pident >= 95) %>% 
-                                           mutate(assembler = assembler,
-                                                  sample = sample,
-                                                  threshold = threshold) %>%
-                                           group_by(assembler, sample, threshold) %>% 
-                                           summarise(num_transcripts = n_distinct(sseqid),
-                                                     num_deNovo = length(qseqid),
-                                                     med_mismatch = median(mismatch),
-                                                     med_gap = median(gapopen),
-                                                     min_scovhsp = min(qcovhsp),
-                                                     max_scovhsp = max(qcovhsp))
-                                         if(nrow(transcripts_df) == 0) {
-                                           transcripts_df <- data.frame('assembler' = assembler,
-                                                                        'sample' = sample,
-                                                                        'num_transcripts' = 0,
-                                                                        'num_deNovo' = 0,
-                                                                        'threshold' = threshold)
-                                         }
-                                         return(transcripts_df)
-                                       }) %>% bind_rows
-                              })
-                            }) %>% bind_rows
-
-# transcriptCvrg.df %>% group_by(sample) %>% slice_max(num_transcripts, n =1)
+transcriptCvrg.df <- lapply(c(50,75,90,95,100), 
+                            function(threshold){
+                              transcripts_df <- blast_forcov.df %>% 
+                                # filter(scovhsp >= threshold,
+                                # pident >= 95) %>%
+                                group_by(assembler_name, sample_name, cdhit_thresh) %>% 
+                                summarise(num_transcripts = n_distinct(sseqid[scovhsp >= threshold &
+                                                                                pident >= 95]),
+                                          min_test = custom_min(scovhsp[scovhsp >= threshold &
+                                                                   pident >= 95]),
+                                          num_deNovo = length(qseqid[scovhsp >= threshold &
+                                                                       pident >= 95]),
+                                          med_mismatch = median(mismatch[scovhsp >= threshold &
+                                                                           pident >= 95]),
+                                          med_gap = median(gapopen[scovhsp >= threshold &
+                                                                     pident >= 95]),
+                                          min_scovhsp = custom_min(qcovhsp[scovhsp >= threshold &
+                                                                      pident >= 95]),
+                                          max_scovhsp = custom_max(qcovhsp[scovhsp >= threshold &
+                                                                      pident >= 95])) %>% 
+                                mutate(threshold = threshold) 
+                            }) %>% bind_rows()
 # 
-# boxplot(transcriptCvrg.df$num_transcripts ~ transcriptCvrg.df$assembler)
+# transcriptCvrg.df %>% filter(sample_name == '21659_8_16', !is.na(cdhit_thresh), assembler_name == 'multiass')
+# 
+# blast_forcov.df %>% filter(sample_name == '21659_8_16', 
+#                            !is.na(cdhit_thresh), 
+#                            assembler_name == 'multiass',
+#                            pident >= 95,
+#                            scovhsp >= 50,
+#                            # sseqid == 'PCHAS_1200200.1-p1'
+#                            ) 
+  
+```
 
-gplot <- ggplot(transcriptCvrg.df, aes(x = assembler, 
-                              y = num_transcripts,
-                              col = assembler)) +
+```{r}
+
+(gplot <- ggplot(transcriptCvrg.df, 
+                aes(x = assembler_name, 
+                    y = num_transcripts,
+                    col = assembler_name)) +
   geom_boxplot() +
   theme_classic() +
   theme(axis.text.x = element_blank()) +
   xlab('Method of transcriptome assembly/meta-assembly') +
   ylab('Number of known transcripts matched') +
-  facet_grid(~ threshold)
+  facet_grid(~ threshold + cdhit_thresh, scales = 'free_x'))
 
-ggsave(filename = '../../plots/chabaudi_numTranscriptsPerAssembByCvrg.pdf',
-       plot = gplot)
+# ggsave(filename = '../../plots/chabaudi_numTranscriptsPerAssembByCvrg.pdf',
+#        plot = gplot)
 
 ```
+
+```{r mismatches}
+
+transcriptCvrg_MultiEvi.df <- filter(transcriptCvrg.df, 
+                                     assembler_name %in% c('multiass','evigene'),
+                                     threshold != 100
+                                     )
+
+ggplot(data = transcriptCvrg_MultiEvi.df,
+       aes(y = med_mismatch,
+           # size = num_deNovo,
+           x = num_transcripts,
+           col = paste(assembler_name, cdhit_thresh, sep = '_'),
+           shape = as.factor(threshold))) +
+  geom_jitter(alpha = 0.75, size = 2) +
+  facet_wrap(~ paste(assembler_name, cdhit_thresh, sep = '_')) +
+  theme_classic()
+
+ggplot(data = transcriptCvrg_MultiEvi.df,
+       aes(y = min_scovhsp,
+           # size = num_deNovo,
+           x = num_transcripts,
+           # col = paste(assembler_name, cdhit_thresh, sep = '_'),
+           shape = as.factor(threshold))) +
+  geom_jitter(alpha = 0.75, size = 2) +
+  facet_wrap(~ paste0(assembler_name, 
+                     ifelse(is.na(cdhit_thresh), '', '_cdhit95'))) +
+  theme_classic()
+```
+
 
 ```{r uniq_transcripts}
 
@@ -449,6 +517,7 @@ blast_hits.df <- lapply(names(sample_blast.list),
                           })
        }) %>% bind_rows
 
+# TODO: Fix, and remove row numbers
 write.xlsx2(
   file = '../../supp_files/suppfile_blast_hits.xlsx',
   x = blast_hits.df
