@@ -251,7 +251,7 @@ transcriptCvrg.df %>% filter(sample_name == '21659_8_16', !is.na(cdhit_thresh), 
   
 ```
 
-```{r}
+```{r coverage_graph}
 
 (gplot <- ggplot(transcriptCvrg.df, 
                 aes(x = assembler_name, 
@@ -296,128 +296,6 @@ ggplot(data = transcriptCvrg_MultiEvi.df,
   facet_wrap(~ paste0(assembler_name, 
                      ifelse(is.na(cdhit_thresh), '', '_cdhit95'))) +
   theme_classic()
-```
-
-
-```{r uniq_transcripts}
-
-transcripts.df <- lapply(names(sample_blast.list),
-       function(sample) {
-         assembly_blast.list <- getElement(sample_blast.list, sample)
-         lapply(names(assembly_blast.list), function(assembler) {
-           assembly_df <- getElement(assembly_blast.list, assembler)
-           transcripts_df <- assembly_df$transcripts_covered_by_denovo_df %>% 
-             filter(scovhsp >= 95) %>% 
-             mutate(assembler = assembler,
-                    sample = sample) %>%
-             group_by(assembler, sample)
-           return(transcripts_df)
-         })
-       }) %>% bind_rows
-
-uniq_genes <- unique(data.table(transcripts.df), by = c("sample","sseqid")) %>% 
-  select(qseqid, sseqid, assembler, sample, everything()) %>% 
-  # filter(assembler != 'evigene') %>% 
-  arrange(sseqid, sample)
-
-filter(transcripts.df, sseqid == 'PCHAS_0200005.1') %>% 
-  select(qseqid, sseqid, assembler, sample, everything()) %>% 
-  arrange(sample)
-
-```
-
-'PCHAS_0213821' only matched by spadesRNA transcripts, 'PCHAS_1200500' only by spadesRNA/SC.
-
-```{r evigene_v_rest}
-evigene_v_rest <- lapply(names(sample_blast.list),
-                         function(sample) {
-                           assembly_blast.list <- getElement(sample_blast.list, sample)
-                           lapply(c('evigene','rest'), 
-                                  function(assembler) {
-                                    if(assembler == 'evigene'){
-                                      assembly_df <- getElement(assembly_blast.list, 
-                                                                assembler)$transcripts_covered_by_denovo_df
-                                      
-                                    } else {
-                                      assembly_df <- bind_rows(lapply(assembly_blast.list[!names(assembly_blast.list) %in% 
-                                                                                            'evigene'], 
-                                                                      getElement, 
-                                                                      'transcripts_covered_by_denovo_df'))
-                                    }
-                                    
-                                    transcripts_df <- assembly_df %>% 
-                                      filter(scovhsp >= 95) %>% 
-                                      mutate(assembler = assembler,
-                                             sample = sample) %>%
-                                      group_by(assembler, sample) %>% 
-                                      summarise(num_transcripts = n_distinct(sseqid),
-                                                num_deNovo = length(qseqid),
-                                                med_mismatch = median(mismatch),
-                                                med_gap = median(gapopen),
-                                                min_scovhsp = min(qcovhsp),
-                                                max_scovhsp = max(qcovhsp))
-                                    if(nrow(transcripts_df) == 0) {
-                                      transcripts_df <- data.frame('assembler' = assembler,
-                                                                   'sample' = sample,
-                                                                   'num_transcripts' = 0,
-                                                                   'num_deNovo' = 0)
-                                    }
-                                    return(transcripts_df)
-                                  })
-                         }) %>% bind_rows
-
-ggplot(evigene_v_rest, aes(x = assembler, 
-                              y = num_transcripts)) +
-  geom_boxplot() +
-  geom_point(aes(col = sample)) +
-  geom_line(aes(col = sample, group = sample)) +
-  theme_classic() +
-  theme(legend.position = 'none')
-```
-
-# Save BLAST hits for supplementary info.
-
-```{r suppl_blast_hits}
-
-uniq_genes_id <- apply(uniq_genes[,c('qseqid','sseqid','sample')],
-                       1,
-                       paste,
-                       collapse = ' ')
-
-blast_hits.df <- lapply(names(sample_blast.list),
-                        function(sample) {
-                          assembly_blast.list <- getElement(sample_blast.list, sample)
-                          lapply(names(assembly_blast.list), function(assembler) {
-                            assembly_df <- getElement(assembly_blast.list, assembler)
-                            transcripts_df <- assembly_df$transcripts_covered_by_denovo_df %>% 
-                              mutate(assembler = assembler,
-                                     sample = sample) %>%
-                              mutate(possible_chimera = ifelse(qcovhsp <= 50 && scovhsp >= 95, 
-                                                               TRUE, 
-                                                               FALSE),
-                                     unique_assembly_match = ifelse(paste(qseqid, sseqid, sample) %in% 
-                                                                      uniq_genes_id,
-                                                                    TRUE,
-                                                                    FALSE),
-                                     uniq_id = paste(qseqid, sseqid, sample, 
-                                                     collapse = '_')) %>% 
-                            group_by(sample, assembler) %>% 
-                              select(qseqid, sseqid, assembler, sample, everything(), -uniq_id)
-                            return(transcripts_df)
-                          })
-       }) %>% bind_rows
-
-# TODO: Fix, and remove row numbers
-write.xlsx2(
-  file = '../../supp_files/suppfile_blast_hits.xlsx',
-  x = blast_hits.df
-)
-
-write_csv2(
-  path = '../../supp_files/suppfile_blast_hits.csv',
-  x = blast_hits.df
-)
-
 ```
 
 # BUSCO scores
