@@ -27,8 +27,7 @@ options(scipen = 999)
 ```{r loading_packages, include = FALSE, message = FALSE}
 # Load the required packages
 library('readr')
-library('dplyr', 
-        lib.loc = "/camp/home/littlet/R/x86_64-pc-linux-gnu-library/4.0")
+library('dplyr')
 library('stringr')
 library('purrr')
 library('kableExtra')
@@ -77,43 +76,70 @@ uniquify <- function(vector_names, first_one = TRUE){
 }
 ```
 
-```{r read_200aa_pirs}
-G18G19_hmmerVir200aa.fa <- read.fasta('/camp/lab/langhornej/working/HPC/littlet/tl22-01_vivaxDeNovo/hmmer/scspades/G18_B20_C19_Z16_M19_R20_K1719_G19-cat/G18_B20_C19_Z16_M19_R20_K1719_G19-cat_scspades_0.95cdhitest_hmmerPfam-PlasmodiumVir_200aa.fasta')
-
-#Need to read in the >200aa ORF length  pirs
-pir_list.vec <- str_extract(
-  names(G18G19_hmmerVir200aa.fa),
-  pattern = 'NODE.+(?=_[[:digit:]])'
-)
-```
-
 ```{r load_salmon}
-#Get the full file paths of the salmon quant.sf files.
-quant_files <- list.files(path = "/camp/lab/langhornej/working/HPC/littlet/tl22-01_vivaxDeNovo/salmon/all_files",
-                          recursive = TRUE,
-                          pattern = 'quant.sf',
-                          full.names = TRUE)
+# experiment.vec <- c('Bourgard21')
+experiment.vec <- c('Bourgard21', 'Imp22', 'K19', 'Meul22', 'R20', 'S20-Z16', 'B20-C19-G19-G18-M19-K17')
 
-#Load the samplesheet.txt file of metadata, add new column for salmon files
-samplesheet <- read.delim("/camp/lab/langhornej/working/HPC/littlet/tl22-01_vivaxDeNovo/samplesheet.txt") %>% 
-  mutate(salmon_quant = '')
+# Load in the quant.sf data by lapply-ing across the experiment/Nextflow analysis names above.
+quant.df <- lapply(experiment.vec,
+       function(experiments){
+         quant_files <- list.files(path = paste0("../../nextflow/vvx_",
+                                                 experiments,
+                                                 "_results"),
+                                   recursive = TRUE,
+                                   pattern = 'quant.sf',
+                                   full.names = TRUE)
+         lapply(quant_files, function(qnt){
+           #Read in the data and get columns for the experimental data
+           read.delim(qnt) %>% 
+             mutate(source = str_extract(qnt, '(?<=/salmon/).+(?=/quant.sf)'),
+                    sample = ifelse(grepl(qnt, pattern = 'Bourgard'),
+                                    str_extract(qnt, '(?<=/salmon/).+(?=(_Bourgard).+/quant.sf)'),
+                                    str_extract(qnt, '(?<=/salmon/).+_vvx_T[[:digit:]]+(?=.+_vvx/quant.sf)')),
+                    assembly = ifelse(grepl(qnt, pattern = 'Bourgard'),
+                                    str_extract(qnt, '(?<=/salmon/(Bourgard))(Bourgard).+(?=/quant.sf)'),
+                                    str_extract(qnt, '(?<=_vvx_T[[:digit:]]{1,2}_).+(?=/quant.sf)')),
+                    file_source = qnt) 
+         }) %>% bind_rows
+       }) %>% bind_rows
 
-#Make a table of the files and the sample metadata from samplesheet.txt
-# for loop over all the quant_files that exist
-for(quant_name in quant_files){
-  #Looking for the sample prefix in the file path between 'all_files' and '{prefix}_quant'
-  prefix <- str_extract(quant_name, 
-                        pattern = '(?<=\\/all_files/).+(?=/.+_quant)')
-  if(nrow(samplesheet[grep(samplesheet$prefix, 
-                   pattern = prefix),]) > 1){
-                     stop(paste0(prefix,
-                                 " matches more than one row of the samplesheet"))
-                   }
-  samplesheet[grep(samplesheet$prefix, 
-                   pattern = prefix),'salmon_quant'] <- quant_name
-}
+quant_filtered.df <- filter(quant.df, 
+       TPM >= 1, 
+       NumReads >= 1)
 
-sum(grepl(samplesheet[,'salmon_quant'], pattern = 'camp')) == 247
+# How many genes are removed for each file source
+group_by(quant.df, file_source) %>% 
+  summarise(prop = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1])/n_distinct(Name) ) %>% 
+  arrange(desc(prop))
+
+
+
+# #Get the full file paths of the salmon quant.sf files.
+# quant_files <- list.files(path = "../../nextflow/",
+#                           recursive = TRUE,
+#                           pattern = 'quant.sf',
+#                           full.names = TRUE)
+# 
+# #Load the samplesheet.txt file of metadata, add new column for salmon files
+# samplesheet <- read.delim("/camp/lab/langhornej/working/HPC/littlet/tl22-01_vivaxDeNovo/samplesheet.txt") %>% 
+#   mutate(salmon_quant = '')
+# 
+# #Make a table of the files and the sample metadata from samplesheet.txt
+# # for loop over all the quant_files that exist
+# for(quant_name in quant_files){
+#   #Looking for the sample prefix in the file path between 'all_files' and '{prefix}_quant'
+#   prefix <- str_extract(quant_name, 
+#                         pattern = '(?<=\\/all_files/).+(?=/.+_quant)')
+#   if(nrow(samplesheet[grep(samplesheet$prefix, 
+#                    pattern = prefix),]) > 1){
+#                      stop(paste0(prefix,
+#                                  " matches more than one row of the samplesheet"))
+#                    }
+#   samplesheet[grep(samplesheet$prefix, 
+#                    pattern = prefix),'salmon_quant'] <- quant_name
+# }
+# 
+# sum(grepl(samplesheet[,'salmon_quant'], pattern = 'camp')) == 247
 ```
 
 ```{r list_expt_quant}
