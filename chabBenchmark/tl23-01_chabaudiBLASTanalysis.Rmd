@@ -202,6 +202,16 @@ TODO: Something is wrong with the below, it's producing weird numbers for the mu
 Get the different subject coverage thresholds at >= 95% identity.
 
 ```{r cvrg_stats}
+
+# Get the best match for each reference pir gene.
+blast_forcov.df <- blast %>%
+  group_by(geneid, blast_name) %>%
+  #Choosing this by bitscore, scovhsp or pident may be important
+  slice_max(order_by = bitscore, n = 1, with_ties = FALSE) %>%
+  group_by(blast_name,
+           sample_name, assembler_name,
+           cdhit_thresh)
+
 #define custom function to calculate min
 custom_min <- function(x) {if (length(x)>0) min(x) else NA}
 custom_max <- function(x) {if (length(x)>0) max(x) else NA}
