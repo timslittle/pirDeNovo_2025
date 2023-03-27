@@ -115,9 +115,6 @@ blast_files <- c(
   list.files(path = "../../blast", 
              pattern = "blastp.outfmt6",
              full.names = TRUE),
-  # list.files(path = "../../blast/chabaudi/", 
-  #            pattern = "CDS.blast",
-  #            full.names = TRUE),
   list.files(path = "../../blast/chabaudi", 
              pattern = "evigene",
              full.names = TRUE)
@@ -343,22 +340,109 @@ busco.files <- c(
   arrange(desc(Complete))
 )
 
-write.xlsx2(
-  file = '../../supp_files/suppfile_busco.xlsx',
-  x = busco.df
-)
+(busco.plot <- ggplot(busco.df, 
+                aes(x = assembler_name, 
+                    y = Complete,
+                    col = assembler_name)) +
+  geom_boxplot() +
+  theme_classic() +
+  theme(axis.text.x = element_blank()) +
+  xlab('Method of transcriptome assembly/meta-assembly') +
+  ylab('Number of Complete Plasmodiium BUSCOs found') +
+  facet_grid(~ cdhit_thresh, scales = 'free_x'))
 
-write_csv2(
-  path = '../../supp_files/suppfile_busco.csv',
-  x = busco.df
-)
+(busco.plot <- ggplot(busco.df, 
+                aes(x = assembler_name, 
+                    y = Duplicated/Complete,
+                    col = assembler_name)) +
+  geom_boxplot() +
+  theme_classic() +
+  theme(axis.text.x = element_blank()) +
+  xlab('Method of transcriptome assembly/meta-assembly') +
+  ylab('Number of Plasmodiium BUSCOs found') +
+    facet_grid(~ cdhit_thresh, scales = 'free_x'))
+
+# write.xlsx2(
+#   file = '../../supp_files/suppfile_busco.xlsx',
+#   x = busco.df
+# )
+# 
+# write_csv2(
+#   path = '../../supp_files/suppfile_busco.csv',
+#   x = busco.df
+# )
 ```
 
 ```{r data_to_save}
-number_transcripts <- system(paste0('cat ',
-                                    params$assembly_file, 
-                                    ' | grep ">" | wc -l'),
-                             intern = TRUE)
+
+fasta.files <- c(
+  list.files(path = '../../nextflow/chab_results_noNumberAtEnd/prodigal/',
+             pattern = "faa",
+             full.names = TRUE),
+  list.files(path = '../../../tl22-03_nfCoreTranscriptCorral/chab_test_results/evigene/okayset',
+             pattern = "aa",
+             full.names = TRUE),
+  Sys.glob(file.path('../../nextflow','*ORF*','prodigal','*.faa'))
+)
+(
+  number_transcripts.df <- lapply(fasta.files, 
+                                  function(fasta.file) {
+                                    number_transcripts <- 
+                                      if(grepl(fasta.file, pattern  = '.gz$')){
+                                        # Use zless to read the zipped files
+                                        system(paste0('zless ',
+                                                      fasta.file,
+                                                      ' | grep ">" | wc -l'),
+                                               intern = TRUE)
+                                      } else{ 
+                                        system(paste0('cat ',
+                                                      fasta.file,
+                                                      ' | grep ">" | wc -l'),
+                                               intern = TRUE)
+                                      }
+                                    
+                                    sample_name <- str_extract(fasta.file,
+                                                               pattern = '(?<=\\/)21659_8.[[:digit:]]{1,2}') %>%
+                                      str_replace_all(pattern = '#', replacement = '_') %>%
+                                      str_remove_all(pattern = 'chabaudi_')
+                                    
+                                    assembler_name <- str_extract(fasta.file,
+                                                                  pattern = 'spadesSC|spadesRNA|trinity|multiass')
+                                    assembler_name <- ifelse(is.na(assembler_name),
+                                                             ifelse(grepl(fasta.file, pattern = 'tl22-03'),
+                                                                    'evigene',
+                                                                    'multiass'),
+                                                             assembler_name)
+                                    
+                                    cdhit_thresh <- ifelse(grepl(fasta.file, pattern = 'cdhit'),
+                                                           str_extract(blast_output_file,
+                                                                       pattern = 'cdhit(|est)[[:digit:]]{2}') %>%
+                                                             str_replace(pattern = 'cdhitest', replacement = 'cdhit'),
+                                                           'none')
+                                    
+                                    data.frame(number_transcripts = as.numeric(number_transcripts),
+                                               filename = fasta.file,
+                                               sample_name = sample_name,
+                                               assembler_name = assembler_name,
+                                               cdhit_thresh = cdhit_thresh)
+                                  }
+  ) %>% bind_rows %>% arrange(desc(number_transcripts))
+)
+
+
+(busco.plot <- ggplot(number_transcripts.df, 
+                aes(x = assembler_name, 
+                    y = number_transcripts,
+                    col = assembler_name)) +
+  geom_boxplot() +
+  theme_classic() +
+  theme(axis.text.x = element_blank()) +
+  xlab('Method of transcriptome assembly/meta-assembly') +
+  ylab('Total number of transcripts') +
+    facet_grid(~ cdhit_thresh, scales = 'free_x'))
+```
+
+```{r}
 # if(any_blast){
   number_knownCovOver95 <- length(unique(transcripts_covered_by_denovo$geneid))
   number_knownCovOver75 <- length(unique(transcripts_covered_by_denovo_75$geneid))
