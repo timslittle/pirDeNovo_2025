@@ -312,11 +312,36 @@ busco.files <- c(
   Sys.glob(file.path('../../nextflow','*ORF*','busco','*-plasmodium_odb10-busco.batch_summary.txt'))
 )
 
-busco.df <- lapply(busco.files, 
-                   read.delim, 
-                   sep = '\t') %>% 
+(busco.df <- lapply(busco.files, function(busco.file) {
+  
+  sample_name <- str_extract(busco.file,
+                             pattern = '(?<=\\/)21659_8.[[:digit:]]{1,2}') %>%
+    str_replace_all(pattern = '#', replacement = '_') %>%
+    str_remove_all(pattern = 'chabaudi_')
+  
+  assembler_name <- str_extract(busco.file,
+                                pattern = 'spadesSC|spadesRNA|trinity|multiass')
+  assembler_name <- ifelse(is.na(assembler_name),
+                           ifelse(grepl(busco.file, pattern = 'tl22-03'),
+                                  'evigene',
+                                  'multiass'),
+                           assembler_name)
+  
+  cdhit_thresh <- ifelse(grepl(busco.file, pattern = 'cdhit'),
+                         str_extract(blast_output_file,
+                                     pattern = 'cdhit(|est)[[:digit:]]{2}') %>%
+                           str_replace(pattern = 'cdhitest', replacement = 'cdhit'),
+                         'none')
+  
+  read.delim( busco.file, sep = '\t') %>%  mutate(filename = busco.file,
+                                             sample_name = sample_name,
+                                             assembler_name = assembler_name,
+                                             cdhit_thresh = cdhit_thresh
+  )
+}) %>% 
   bind_rows %>% 
   arrange(desc(Complete))
+)
 
 write.xlsx2(
   file = '../../supp_files/suppfile_busco.xlsx',
