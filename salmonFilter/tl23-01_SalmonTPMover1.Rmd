@@ -31,7 +31,7 @@ library('dplyr')
 library('stringr')
 library('purrr')
 library('kableExtra')
-library('plotly')
+# library('plotly')
 library('rmarkdown')
 library('seqinr')
 
@@ -121,46 +121,27 @@ quant.df <- lapply(experiment.vec,
          }) %>% bind_rows
        }) %>% bind_rows
 
-filter(quant.df, is.na(sample)) %>% .$source %>% unique
-quant.df %>% .$source %>% unique
+# write_csv(quant.df, path = 'salmonQuant_all.csv')
 
-quant_filtered.df <- filter(quant.df, 
-       TPM >= 1, 
-       NumReads >= 1)
+#QC: Which sample names are NA:
+# filter(quant.df, is.na(sample)) %>% .$source %>% unique
 
-# How many genes are removed for each file source
-group_by(quant.df, file_source) %>% 
+# Grouping by each assembly and transcript, which transcripts have TPM and NumReads < 1 TPM in every sample.
+#. i.e. Filter out every transcript with at leas one sample with >= 1 TPM/NumReads.
+quant_filtered.df <- group_by(quant.df, 
+                              assembly,
+                              Name) %>% 
+  filter(any(TPM >= 1 & NumReads >= 1))
+
+# quant_filtered.df %>% filter(TPM < 1)
+
+# write_csv(quant_filtered.df, path = 'salmonQuant_filtered.csv')
+
+# How many genes are kept for each assembly
+group_by(quant.df, assembly) %>% 
   summarise(prop = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1])/n_distinct(Name) ) %>% 
-  arrange(desc(prop))
+  arrange(prop)
 
-
-
-# #Get the full file paths of the salmon quant.sf files.
-# quant_files <- list.files(path = "../../nextflow/",
-#                           recursive = TRUE,
-#                           pattern = 'quant.sf',
-#                           full.names = TRUE)
-# 
-# #Load the samplesheet.txt file of metadata, add new column for salmon files
-# samplesheet <- read.delim("/camp/lab/langhornej/working/HPC/littlet/tl22-01_vivaxDeNovo/samplesheet.txt") %>% 
-#   mutate(salmon_quant = '')
-# 
-# #Make a table of the files and the sample metadata from samplesheet.txt
-# # for loop over all the quant_files that exist
-# for(quant_name in quant_files){
-#   #Looking for the sample prefix in the file path between 'all_files' and '{prefix}_quant'
-#   prefix <- str_extract(quant_name, 
-#                         pattern = '(?<=\\/all_files/).+(?=/.+_quant)')
-#   if(nrow(samplesheet[grep(samplesheet$prefix, 
-#                    pattern = prefix),]) > 1){
-#                      stop(paste0(prefix,
-#                                  " matches more than one row of the samplesheet"))
-#                    }
-#   samplesheet[grep(samplesheet$prefix, 
-#                    pattern = prefix),'salmon_quant'] <- quant_name
-# }
-# 
-# sum(grepl(samplesheet[,'salmon_quant'], pattern = 'camp')) == 247
 ```
 
 ```{r list_expt_quant}
