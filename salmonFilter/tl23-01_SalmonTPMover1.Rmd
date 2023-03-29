@@ -78,7 +78,8 @@ uniquify <- function(vector_names, first_one = TRUE){
 
 ```{r load_salmon}
 # experiment.vec <- c('Bourgard21')
-experiment.vec <- c('Bourgard21', 'Imp22', 'K19', 'Meul22', 'R20', 'S20-Z16', 'B20-C19-G19-G18-M19-K17')
+experiment.vec <- c('Bourgard21', 'Imp22', 'K19', 'Meul22', 'Meul22-PNG',
+                    'R20', 'S20-Z16', 'B20-C19-G19-G18-M19-K17')
 
 # Load in the quant.sf data by lapply-ing across the experiment/Nextflow analysis names above.
 quant.df <- lapply(experiment.vec,
@@ -88,20 +89,40 @@ quant.df <- lapply(experiment.vec,
                                                  "_results"),
                                    recursive = TRUE,
                                    pattern = 'quant.sf',
-                                   full.names = TRUE)
+                                   full.names = TRUE) %>% 
+           str_subset(pattern = '.+T[[:digit:]].+')
+         
+         #Some of the files are from erroneous runs of the software, can grep for the 'T1' etc name to find those ran with the more modern pipeline. TODO: Remove the old files.
+         
+         #Used different naming parameters for some files like an eejit, need to find these specifically:
+         
+         sample.pattern <- case_when(
+           experiments == 'Bourgard21' ~ '(?<=/salmon/).+(?=(_Bourgard).+/quant.sf)',
+           grepl(experiments, pattern = 'Meul22') ~ '(?<=/salmon/)vvx_.+_T[[:digit:]]{1,2}(?=_vvx.+/quant.sf)',
+           .default = '(?<=/salmon/).+_vvx_T[[:digit:]]{1,2}(?=.+_vvx/quant.sf)'
+         )
+         
+         assembly.pattern = case_when(
+           experiments == 'Bourgard21' ~ '(?<=_T[[:digit:]]{1,2}_)Bourgard.+(?=/quant.sf)',
+           grepl(experiments, pattern = 'Meul22') ~ '(?<=_T[[:digit:]]{1,2}_)vvx_.+(?=/quant.sf)',
+           .default  = '(?<=_vvx_T[[:digit:]]{1,2}_).+(?=/quant.sf)'
+         )
+
+         
          lapply(quant_files, function(qnt){
            #Read in the data and get columns for the experimental data
            read.delim(qnt) %>% 
              mutate(source = str_extract(qnt, '(?<=/salmon/).+(?=/quant.sf)'),
-                    sample = ifelse(grepl(qnt, pattern = 'Bourgard'),
-                                    str_extract(qnt, '(?<=/salmon/).+(?=(_Bourgard).+/quant.sf)'),
-                                    str_extract(qnt, '(?<=/salmon/).+_vvx_T[[:digit:]]+(?=.+_vvx/quant.sf)')),
-                    assembly = ifelse(grepl(qnt, pattern = 'Bourgard'),
-                                    str_extract(qnt, '(?<=/salmon/(Bourgard))(Bourgard).+(?=/quant.sf)'),
-                                    str_extract(qnt, '(?<=_vvx_T[[:digit:]]{1,2}_).+(?=/quant.sf)')),
+                    sample =  str_extract(qnt,
+                                          sample.pattern),
+                    assembly = str_extract(qnt,
+                                           assembly.pattern),
                     file_source = qnt) 
          }) %>% bind_rows
        }) %>% bind_rows
+
+filter(quant.df, is.na(sample)) %>% .$source %>% unique
+quant.df %>% .$source %>% unique
 
 quant_filtered.df <- filter(quant.df, 
        TPM >= 1, 
