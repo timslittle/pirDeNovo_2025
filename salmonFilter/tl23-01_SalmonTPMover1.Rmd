@@ -84,9 +84,12 @@ experiment.vec <- c('Bourgard21', 'Imp22', 'K19', 'Meul22', 'Meul22-PNG',
 # Load in the quant.sf data by lapply-ing across the experiment/Nextflow analysis names above.
 quant.df <- lapply(experiment.vec,
        function(experiments){
-         quant_files <- list.files(path = paste0("../../nextflow/vvx_",
+         
+         results.path = paste0("../../nextflow/vvx_",
                                                  experiments,
-                                                 "_results"),
+                                                 "_results")
+         
+         quant_files <- list.files(path = results.path,
                                    recursive = TRUE,
                                    pattern = 'quant.sf',
                                    full.names = TRUE) %>% 
@@ -117,7 +120,8 @@ quant.df <- lapply(experiment.vec,
                                           sample.pattern),
                     assembly = str_extract(qnt,
                                            assembly.pattern),
-                    file_source = qnt) 
+                    file_source = qnt,
+                    results_path = results.path) 
          }) %>% bind_rows
        }) %>% bind_rows
 
@@ -143,6 +147,20 @@ group_by(quant.df, assembly) %>%
   arrange(prop)
 
 ```
+
+Combine the expression data with the HMMer pirs.
+
+```{r hmmer_results}
+list_files.path <- Sys.glob("../../nextflow/vvx_*")
+
+lapply(unique(quant_filtered.df$assembly), 
+       function(assembly.name){
+         list.files(path = "", recursive = TRUE, pattern = assembly.name)
+  read.table()
+})
+```
+
+Extract the fasta files of pirs expressed above threshold.
 
 ```{r list_expt_quant}
 expt_quant <- lapply(unique(samplesheet$Experiment),
