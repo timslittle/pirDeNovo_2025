@@ -83,7 +83,8 @@ read_HMMertxtgz <- function(hmmer_gz.path) {
   header.index <- first(which(grepl(hmmer_gz.df, 
                                     pattern = 'E-value')))
   end.index <- first(which(grepl(hmmer_gz.df, 
-                                 pattern = 'inclusion threshold ')))
+                                 pattern = 'inclusion threshold|Domain annotation for each sequence')))
+  if(any(grepl(hmmer_gz.df, pattern = 'Domain annotation for each sequence'))) end.index <- end.index - 2
   hmmer_gz.df <- hmmer_gz.df[c(header.index,
                                (header.index+2):(end.index - 1))]
   hmmer_gz.df <- sapply(hmmer_gz.df, function(line){
@@ -149,36 +150,45 @@ quant.df <- lapply(experiment.vec,
                      #Get the assembly names
                      
                      assembly.names <-  unique(str_extract(quant_files, 
-                                                    pattern = assembly.pattern))
+                                                           pattern = assembly.pattern))
                      # For each assembly do:
                      lapply(assembly.names, function (assembly.nam){
                        
                        print(paste0("Doing ", assembly.nam))
                        
                        #HMMer file:
-                       hmmer.path <- file.path(results.path, 
-                                               "hmmer",
-                                               paste0(assembly.nam,
-                                                      "_hmmer_matches.txt"))
+                       # hmmer.path <- file.path(results.path, 
+                       #                         "hmmer",
+                       #                         paste0(assembly.nam,
+                       #                                "_hmmer_matches.txt"))
                        
                        #HMMer results - requires a decent amount of processing - put into a function.
                        hmmer_gz.path <- file.path(results.path, 
                                                   "hmmer",
                                                   paste0(assembly.nam,".txt.gz"))
                        
-                       hmmer_gz.df <- read_HMMertxtgz(hmmer_gz.path) %>% 
-                         mutate(Name = Sequence)
-                       
-                       #Throw error is there is more than one hmmer_path for an assembly, should be impossible.
-                       stopifnot(length(hmmer.path) == 1)
-                       
-                       # Read in the list of HMMer matches, subset to get as a vector.
-                       #  Ignore if empty.
-                       if(!is_empty(readLines(hmmer.path))){
-                         hmmer.list <- read.table(hmmer.path, stringsAsFactors = FALSE)[,1]
+                       if(!any(grepl(readLines(hmmer_gz.path), 
+                                     pattern = 'No targets detected that satisfy reporting thresholds'))){
+                         hmmer_gz.df <- read_HMMertxtgz(hmmer_gz.path) %>% 
+                           mutate(Name = Sequence)
                        } else {
-                         hmmer.list <- ''
+                         #Create an empty data.frame when there are no HMMer matches
+                         hmmer_gz.df <- setNames(data.frame(matrix(ncol = 11, nrow = 1)),
+                                                 c("E-value_fullseq", "score_fullseq", "bias_fullseq", "E-value_bestdom", 
+                                                   "score_bestdom", "bias_bestdom", "exp_numdom", "N_numdom", "Sequence", 
+                                                   "Description", "Name"))
                        }
+                       
+                       # #Throw error is there is more than one hmmer_path for an assembly, should be impossible.
+                       # stopifnot(length(hmmer.path) == 1)
+                       # 
+                       # # Read in the list of HMMer matches, subset to get as a vector.
+                       # #  Ignore if empty.
+                       # if(!is_empty(readLines(hmmer.path))){
+                       #   hmmer.list <- read.table(hmmer.path, stringsAsFactors = FALSE)[,1]
+                       # } else {
+                       #   hmmer.list <- ''
+                       # }
                        
                        #Fasta file
                        
@@ -208,9 +218,12 @@ quant.df <- lapply(experiment.vec,
                                   file_source = qnt,
                                   results_path = results.path,
                                   hmmer_path = hmmer.path,
-                                  hmmer_match = ifelse(!is_empty(hmmer.list) & Name %in% hmmer.list, 'Yes', 'No'),
+                                  # hmmer_match = ifelse(!is_empty(hmmer.list) & Name %in% hmmer.list, 'Yes', 'No'),
                                   fasta_path = fasta.path) 
-                       }) %>% bind_rows
+                       }) %>% 
+                         bind_rows %>% 
+                         # Combine with the HMMer 
+                         left_join(hmmer_gz.df, by = 'Name')
                      }) %>% bind_rows
                    }) %>% bind_rows
 
@@ -218,25 +231,6 @@ quant.df <- lapply(experiment.vec,
 
 #QC: Which sample names are NA:
 # filter(quant.df, is.na(sample)) %>% .$source %>% unique
-
-tmp <- lapply(assembly_quant.files, function(qnt){
-                         
-                         # Get the samples mapped in these quant files
-                         
-                         sample.nam <- str_extract(qnt,
-                                                   pattern = sample.pattern)
-                         
-                         #Read in the qnt file and add information, including whether the transcripts is a hmmer match.
-                         read.delim(qnt) %>% 
-                           mutate(source = str_extract(qnt, '(?<=/salmon/).+(?=/quant.sf)'),
-                                  sample =  sample.nam,
-                                  assembly = assembly.nam,
-                                  file_source = qnt,
-                                  results_path = results.path,
-                                  hmmer_path = hmmer.path,
-                                  hmmer_match = ifelse(!is_empty(hmmer.list) & Name %in% hmmer.list, 'Yes', 'No'),
-                                  fasta_path = fasta.path) 
-                       }) %>% bind_rows
 ```
 
 ```{r quant_filtered}
