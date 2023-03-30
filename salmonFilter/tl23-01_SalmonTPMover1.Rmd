@@ -13,7 +13,7 @@ output:
 
 # Intro
 
-This script analyses the results of a _de novo_ assembly of Plasmodium vivax RNAseq data.
+This script filters the de novo transcripts from P. vivax for those that match pirs, and are expressed.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, 
@@ -76,6 +76,36 @@ uniquify <- function(vector_names, first_one = TRUE){
 }
 ```
 
+```{r function_read_HMMertxtgz}
+
+read_HMMertxtgz <- function(hmmer_gz.path) {
+  hmmer_gz.df <- readLines(hmmer_gz.path)
+  header.index <- first(which(grepl(hmmer_gz.df, 
+                                    pattern = 'E-value')))
+  end.index <- first(which(grepl(hmmer_gz.df, 
+                                 pattern = 'inclusion threshold ')))
+  hmmer_gz.df <- hmmer_gz.df[c(header.index,
+                               (header.index+2):(end.index - 1))]
+  
+  hmmer_gz.df <- hmmer_gz.df[c(header.index,
+                               (header.index+2):(end.index - 1))]
+  hmmer_gz.df <- sapply(hmmer_gz.df, function(line){
+    #Split by whitespace and remove the first element (which is blank)
+    str_split(line, pattern = "\\s+")[[1]][-1]
+  })
+  num_cols <- length(hmmer_gz.df[[1]])
+  col_nam <- hmmer_gz.df[[1]]
+  hmmer_gz.df <- lapply(hmmer_gz.df[-1], 
+                        function(line){
+                          data.frame(t(unlist(c(line[1:num_cols - 1], paste(line[num_cols:length(line)], collapse = "")))))
+                        }) %>% bind_rows
+  colnames(hmmer_gz.df) <- col_nam
+  return(hmmer_gz.df)
+}
+
+```
+
+
 ```{r load_salmon}
 # experiment.vec <- c('Bourgard21')
 experiment.vec <- c('Bourgard21', 'Imp22', 'K19', 'Meul22', 'Meul22-PNG',
@@ -89,7 +119,7 @@ quant.df <- lapply(experiment.vec,
                                            experiments,
                                            "_results")
                      
-                     quant_files <- list.files(path = results.path,
+                     quant_files <- list.files(path = file.path(results.path, "salmon"),
                                                recursive = TRUE,
                                                pattern = 'quant.sf',
                                                full.names = TRUE) %>% 
@@ -120,11 +150,26 @@ quant.df <- lapply(experiment.vec,
                      # For each assembly do:
                      lapply(assembly.names, function (assembly.nam){
                        
+                       print(paste0("Doing ", assembly.nam))
+                       
                        #HMMer file:
                        hmmer.path <- file.path(results.path, 
                                                "hmmer",
                                                paste0(assembly.nam,
                                                       "_hmmer_matches.txt"))
+                       
+                       #HMMer results - requires a decent amount of processing.
+                       hmmer_gz.path <- file.path(results.path, 
+                                                  "hmmer",
+                                                  paste0(assembly.nam,".txt.gz"))
+                       
+                       read_HMMertxtgz(hmmer_gz.path)
+                       
+                       list.files(file.path(results.path, 
+                                               "hmmer"))
+                       read_table(file.path(results.path, 
+                                               "hmmer",
+                                               paste0(assembly.nam,".txt.gz")))
                        
                        #Throw error is there is more than one hmmer_path for an assembly, should be impossible.
                        stopifnot(length(hmmer.path) == 1)
@@ -136,6 +181,13 @@ quant.df <- lapply(experiment.vec,
                        } else {
                          hmmer.list <- ''
                        }
+                       
+                       #Fasta file
+                       
+                       fasta.path <- file.path(results.path, 
+                                               "evigene", "okayset",
+                                               paste0(assembly.nam,
+                                                      ".okay.aa"))
                        
                        # Get the quant files for this assembly
                        assembly_quant.files <- str_subset(quant_files,
@@ -158,7 +210,8 @@ quant.df <- lapply(experiment.vec,
                                   file_source = qnt,
                                   results_path = results.path,
                                   hmmer_path = hmmer.path,
-                                  hmmer_match = ifelse(!is_empty(hmmer.list) & Name %in% hmmer.list, 'Yes', 'No')) 
+                                  hmmer_match = ifelse(!is_empty(hmmer.list) & Name %in% hmmer.list, 'Yes', 'No'),
+                                  fasta_path = fasta.path) 
                        }) %>% bind_rows
                      }) %>% bind_rows
                    }) %>% bind_rows
@@ -181,34 +234,22 @@ quant_filtered.df <- group_by(quant.df,
 
 # write_csv(quant_filtered.df, path = 'salmonQuant_filtered.csv')
 
-# How many genes are kept for each assembly
+# How many genes/pir genes are kept for each assembly
 group_by(quant.df, assembly) %>% 
-  summarise(prop = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1])/n_distinct(Name) ) %>% 
-  arrange(prop)
+  summarise(prop = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1])/n_distinct(Name),
+            prop_pir = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1 & hmmer_match == 'Yes'])/n_distinct(Name[hmmer_match == 'Yes']),
+            num_pir = n_distinct(Name[hmmer_match == 'Yes'])) %>% 
+  arrange(prop_pir)
 
-unique(quant.df$hmmer_path)
-
-```
-
-Combine the expression data with the HMMer pirs.
-
-```{r hmmer_results}
-
-lapply(unique(quant_filtered.df$assembly)[1], 
-       function(assembly.name){
-         hmmer_path <- unique(quant_filtered.df$hmmer_path[quant_filtered.df$assembly == assembly.name])
-         
-         #Throw error is there is more than one hmmer_path for an assembly, should be impossible.
-         stopifnot(length(hmmer_path) == 1)
-         
-         # Read in the list of HMMer matches, subset to get as a vector.
-         hmmer.list <- read.table(hmmer_path, stringsAsFactors = FALSE)[,1]
-         
-         
-})
 ```
 
 Extract the fasta files of pirs expressed above threshold.
+
+```{r fasta}
+
+```
+
+
 
 ```{r list_expt_quant}
 expt_quant <- lapply(unique(samplesheet$Experiment),
