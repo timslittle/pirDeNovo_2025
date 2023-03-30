@@ -86,9 +86,6 @@ read_HMMertxtgz <- function(hmmer_gz.path) {
                                  pattern = 'inclusion threshold ')))
   hmmer_gz.df <- hmmer_gz.df[c(header.index,
                                (header.index+2):(end.index - 1))]
-  
-  hmmer_gz.df <- hmmer_gz.df[c(header.index,
-                               (header.index+2):(end.index - 1))]
   hmmer_gz.df <- sapply(hmmer_gz.df, function(line){
     #Split by whitespace and remove the first element (which is blank)
     str_split(line, pattern = "\\s+")[[1]][-1]
@@ -102,7 +99,6 @@ read_HMMertxtgz <- function(hmmer_gz.path) {
   colnames(hmmer_gz.df) <- col_nam
   return(hmmer_gz.df)
 }
-
 ```
 
 
