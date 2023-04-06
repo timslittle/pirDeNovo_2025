@@ -54,14 +54,8 @@ library('data.table')
 library('xlsx')
 ```
 
-```{r function_ordering}
-ordering <- function(to_order, order_vector, fromLast = TRUE){
-  order = unlist(sapply(order_vector, 
-                        function(x){unique(str_subset(to_order, 
-                                                      pattern = paste(x)))}))
-  order_missing = unique(to_order[!to_order %in% order])
-  unique(c(order, order_missing), fromLast = fromLast)
-}
+```{r function_import}
+sapply(list.files('../rfunctions', full.names = TRUE), source)
 ```
 
 ```{r function_alternateReverse}
@@ -471,12 +465,14 @@ times_stages_table <- data.frame(time = c('02h', '05h', '08h', '11h', '14h', '17
                                                       'Late-Trophs',
                                                       'Early-Rings',
                                                       'Early-Mid-Rings',
-                                                      'Late-Mid-Rings'))
+                                                      'Late-Mid-Rings')) %>% 
+  mutate(stage_diff_count = make.names(stage_diff_count))
 #The sample names and the times they correspond to:
 times_stages_table <- read_tsv(file = 'samples_lanes_rMT.list', col_names = FALSE) %>% 
   # Convert to the same time format
   mutate(time = format(strptime(str_extract(X1, pattern = '(?<=Pc).+(?=-)'), "%I%p"), "%Hh"),
-         sample_name = str_replace_all(X3, pattern = '#', replacement = '_')) %>% 
+         sample_name = str_replace_all(X3, pattern = '#', replacement = '_'),
+         stage_diff_count = uniquify(stage_diff_count)) %>% 
   left_join(times_stages_table)
 
 tpm_data <- read.csv('tl19-07_twentyfour_tpm_samples.csv',
@@ -486,11 +482,14 @@ tpm_data <- read.csv('tl19-07_twentyfour_tpm_samples.csv',
   select(colnames(counts)[order(colnames(counts))]) %>% 
   melt(id.vars = 'Geneid', variable.name = "stage", value.name = "tpm") %>% 
   mutate(geneid = Geneid, 
-         time = str_extract(stage, pattern = '(?<=rMT_)[[:digit:]]{2}h(?=_)'))
+         time = str_extract(stage, pattern = '(?<=rMT_)[[:digit:]]{2}h(?=_)'),
+         stage_avg = )
 
 tpm_time.df <- left_join(tpm_data, times_stages_table)
 # left_join(blast, tpm_time.df, by = )
-left_join(head(blast), tpm_time.df, by = c('geneid', 'sample_name'))
+left_join(head(blast, n = 1000), tpm_time.df, by = c('geneid', 'sample_name'))
+
+left_join(head(blast, n = 1000), times_stages_table, by = c('sample_name'))
 ```
 
 
