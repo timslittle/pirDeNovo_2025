@@ -77,16 +77,15 @@ uniquify <- function(vector_names, first_one = TRUE){
 ```
 
 ```{r function_read_HMMertxtgz}
-
 read_HMMertxtgz <- function(hmmer_gz.path) {
-  hmmer_gz.df <- readLines(hmmer_gz.path)
-  header.index <- first(which(grepl(hmmer_gz.df, 
+  hmmer_gz_all.df <- readLines(hmmer_gz.path)
+  header.index <- first(which(grepl(hmmer_gz_all.df, 
                                     pattern = 'E-value')))
-  end.index <- first(which(grepl(hmmer_gz.df, 
+  end.index <- first(which(grepl(hmmer_gz_all.df, 
                                  pattern = 'inclusion threshold|Domain annotation for each sequence')))
-  if(any(grepl(hmmer_gz.df, pattern = 'Domain annotation for each sequence'))) end.index <- end.index - 2
-  hmmer_gz.df <- hmmer_gz.df[c(header.index,
-                               (header.index+2):(end.index - 1))]
+  if(any(grepl(hmmer_gz_all.df, pattern = 'Domain annotation for each sequence'))) end.index <- end.index - 2
+  hmmer_gz.df <- hmmer_gz_all.df[c(header.index,
+                                   (header.index+2):(end.index - 1))]
   hmmer_gz.df <- sapply(hmmer_gz.df, function(line){
     #Split by whitespace and remove the first element of each line (which is blank)
     str_split(line, pattern = "\\s+")[[1]][-1]
@@ -105,6 +104,19 @@ read_HMMertxtgz <- function(hmmer_gz.path) {
                                                       collapse = "")))))
                         }) %>% bind_rows
   colnames(hmmer_gz.df) <- col_nam
+  hmmer_gz.df <-  mutate(hmmer_gz.df, Sequence = as.character(Sequence))
+  
+  #I can't get this working in 'mutate' for whatever reason, so have to do it manually and then add it in.
+  hmm_cvrg.vec <- unlist(lapply(hmmer_gz.df$Sequence, function(Sequence) {
+     as.numeric(strsplit(hmmer_gz_all.df[which(str_detect(hmmer_gz_all.df, 
+                                                                            pattern = Sequence))[2]+3],
+                                           split = '\\s+')[[1]][9]) - as.numeric(strsplit(hmmer_gz_all.df[which(str_detect(hmmer_gz_all.df, 
+                                                                                                                           pattern = Sequence))[2]+3],
+                                                                                          split = '\\s+')[[1]][8])
+  }))
+  
+  hmmer_gz.df$hmm_cvrg <- hmm_cvrg.vec
+  
   return(hmmer_gz.df)
 }
 ```
@@ -116,118 +128,122 @@ experiment.vec <- c('Bourgard21', 'Imp22', 'K19', 'Meul22', 'Meul22-PNG',
                     'R20', 'S20-Z16', 'B20-C19-G19-G18-M19-K17')
 
 # Load in the quant.sf data by lapply-ing across the experiment/Nextflow analysis names above.
-quant.df <- lapply(experiment.vec,
-                   function(experiments){
-                     
-                     results.path = paste0("../../nextflow/vvx_",
-                                           experiments,
-                                           "_results")
-                     
-                     quant_files <- list.files(path = file.path(results.path, "salmon"),
-                                               recursive = TRUE,
-                                               pattern = 'quant.sf',
-                                               full.names = TRUE) %>% 
-                       str_subset(pattern = '.+T[[:digit:]].+')
-                     
-                     #Some of the files are from erroneous runs of the software, can grep for the 'T1' etc name to find those ran with the more 
-                     # modern pipeline. 
-                     #TODO: Remove the old files.
-                     
-                     #Used different naming parameters for some files like an eejit, need to find these specifically:
-                     
-                     sample.pattern <- case_when(
-                       experiments == 'Bourgard21' ~ '(?<=/salmon/).+(?=(_Bourgard).+/quant.sf)',
-                       grepl(experiments, pattern = 'Meul22') ~ '(?<=/salmon/)vvx_.+_T[[:digit:]]{1,2}(?=_vvx.+/quant.sf)',
-                       .default = '(?<=/salmon/).+_vvx_T[[:digit:]]{1,2}(?=.+_vvx/quant.sf)'
-                     )
-                     
-                     assembly.pattern = case_when(
-                       experiments == 'Bourgard21' ~ '(?<=_T[[:digit:]]{1,2}_)Bourgard.+(?=/quant.sf)',
-                       grepl(experiments, pattern = 'Meul22') ~ '(?<=_T[[:digit:]]{1,2}_)vvx_.+(?=/quant.sf)',
-                       .default  = '(?<=_vvx_T[[:digit:]]{1,2}_).+(?=/quant.sf)'
-                     )
-                     
-                     #Get the assembly names
-                     
-                     assembly.names <-  unique(str_extract(quant_files, 
-                                                           pattern = assembly.pattern))
-                     # For each assembly do:
-                     lapply(assembly.names, function (assembly.nam){
-                       
-                       print(paste0("Doing ", assembly.nam))
-                       
-                       #HMMer file:
-                       # hmmer.path <- file.path(results.path, 
-                       #                         "hmmer",
-                       #                         paste0(assembly.nam,
-                       #                                "_hmmer_matches.txt"))
-                       
-                       #HMMer results - requires a decent amount of processing - put into a function.
-                       hmmer_gz.path <- file.path(results.path, 
-                                                  "hmmer",
-                                                  paste0(assembly.nam,".txt.gz"))
-                       
-                       if(!any(grepl(readLines(hmmer_gz.path), 
-                                     pattern = 'No targets detected that satisfy reporting thresholds'))){
-                         hmmer_gz.df <- read_HMMertxtgz(hmmer_gz.path) %>% 
-                           mutate(Name = Sequence)
-                       } else {
-                         #Create an empty data.frame when there are no HMMer matches
-                         hmmer_gz.df <- setNames(data.frame(matrix(ncol = 11, nrow = 1)),
-                                                 c("E-value_fullseq", "score_fullseq", "bias_fullseq", "E-value_bestdom", 
-                                                   "score_bestdom", "bias_bestdom", "exp_numdom", "N_numdom", "Sequence", 
-                                                   "Description", "Name"))
-                       }
-                       
-                       # #Throw error is there is more than one hmmer_path for an assembly, should be impossible.
-                       # stopifnot(length(hmmer.path) == 1)
-                       # 
-                       # # Read in the list of HMMer matches, subset to get as a vector.
-                       # #  Ignore if empty.
-                       # if(!is_empty(readLines(hmmer.path))){
-                       #   hmmer.list <- read.table(hmmer.path, stringsAsFactors = FALSE)[,1]
-                       # } else {
-                       #   hmmer.list <- ''
-                       # }
-                       
-                       #Fasta file
-                       
-                       fasta.path <- file.path(results.path, 
-                                               "evigene", "okayset",
-                                               paste0(assembly.nam,
-                                                      ".okay.aa"))
-                       
-                       # Get the quant files for this assembly
-                       assembly_quant.files <- str_subset(quant_files,
-                                                          pattern = assembly.nam)
-                       
-                       # For each quant file do:
-                       
-                       lapply(assembly_quant.files, function(qnt){
-                         
-                         # Get the samples mapped in these quant files
-                         
-                         sample.nam <- str_extract(qnt,
-                                                   pattern = sample.pattern)
-                         
-                         #Read in the qnt file and add information, including whether the transcripts is a hmmer match.
-                         read.delim(qnt) %>% 
-                           mutate(source = str_extract(qnt, '(?<=/salmon/).+(?=/quant.sf)'),
-                                  sample =  sample.nam,
-                                  assembly = assembly.nam,
-                                  file_source = qnt,
-                                  results_path = results.path,
-                                  hmmer_path = hmmer.path,
-                                  # hmmer_match = ifelse(!is_empty(hmmer.list) & Name %in% hmmer.list, 'Yes', 'No'),
-                                  fasta_path = fasta.path) 
-                       }) %>% 
-                         bind_rows %>% 
-                         # Combine with the HMMer 
-                         left_join(hmmer_gz.df, by = 'Name')
-                     }) %>% bind_rows
-                   }) %>% bind_rows
+# quant.df <- lapply(experiment.vec,
+#                    function(experiments){
+#                      
+#                      results.path = paste0("../../nextflow/vvx_",
+#                                            experiments,
+#                                            "_results")
+#                      
+#                      quant_files <- list.files(path = file.path(results.path, "salmon"),
+#                                                recursive = TRUE,
+#                                                pattern = 'quant.sf',
+#                                                full.names = TRUE) %>% 
+#                        str_subset(pattern = '.+T[[:digit:]].+')
+#                      
+#                      #Some of the files are from erroneous runs of the software, can grep for the 'T1' etc name to find those ran with the more 
+#                      # modern pipeline. 
+#                      #TODO: Remove the old files.
+#                      
+#                      #Used different naming parameters for some files like an eejit, need to find these specifically:
+#                      
+#                      sample.pattern <- case_when(
+#                        experiments == 'Bourgard21' ~ '(?<=/salmon/).+(?=(_Bourgard).+/quant.sf)',
+#                        grepl(experiments, pattern = 'Meul22') ~ '(?<=/salmon/)vvx_.+_T[[:digit:]]{1,2}(?=_vvx.+/quant.sf)',
+#                        .default = '(?<=/salmon/).+_vvx_T[[:digit:]]{1,2}(?=.+_vvx/quant.sf)'
+#                      )
+#                      
+#                      assembly.pattern = case_when(
+#                        experiments == 'Bourgard21' ~ '(?<=_T[[:digit:]]{1,2}_)Bourgard.+(?=/quant.sf)',
+#                        grepl(experiments, pattern = 'Meul22') ~ '(?<=_T[[:digit:]]{1,2}_)vvx_.+(?=/quant.sf)',
+#                        .default  = '(?<=_vvx_T[[:digit:]]{1,2}_).+(?=/quant.sf)'
+#                      )
+#                      
+#                      #Get the assembly names
+#                      
+#                      assembly.names <-  unique(str_extract(quant_files, 
+#                                                            pattern = assembly.pattern))
+#                      # For each assembly do:
+#                      lapply(assembly.names, function (assembly.nam){
+#                        
+#                        print(paste0("Doing ", assembly.nam))
+#                        
+#                        #HMMer file:
+#                        # hmmer.path <- file.path(results.path, 
+#                        #                         "hmmer",
+#                        #                         paste0(assembly.nam,
+#                        #                                "_hmmer_matches.txt"))
+#                        
+#                        #HMMer results - requires a decent amount of processing - put into a function.
+#                        hmmer_gz.path <- file.path(results.path, 
+#                                                   "hmmer",
+#                                                   paste0(assembly.nam,".txt.gz"))
+#                        
+#                        if(!any(grepl(readLines(hmmer_gz.path), 
+#                                      pattern = 'No targets detected that satisfy reporting thresholds'))){
+#                          hmmer_gz.df <- read_HMMertxtgz(hmmer_gz.path) %>% 
+#                            mutate(Name = Sequence)
+#                        } else {
+#                          #Create an empty data.frame when there are no HMMer matches
+#                          hmmer_gz.df <- setNames(data.frame(matrix(ncol = 11, nrow = 1)),
+#                                                  c("E-value_fullseq", "score_fullseq", "bias_fullseq", "E-value_bestdom", 
+#                                                    "score_bestdom", "bias_bestdom", "exp_numdom", "N_numdom", "Sequence", 
+#                                                    "Description", "Name"))
+#                        }
+#                        
+#                        # #Throw error is there is more than one hmmer_path for an assembly, should be impossible.
+#                        # stopifnot(length(hmmer.path) == 1)
+#                        # 
+#                        # # Read in the list of HMMer matches, subset to get as a vector.
+#                        # #  Ignore if empty.
+#                        # if(!is_empty(readLines(hmmer.path))){
+#                        #   hmmer.list <- read.table(hmmer.path, stringsAsFactors = FALSE)[,1]
+#                        # } else {
+#                        #   hmmer.list <- ''
+#                        # }
+#                        
+#                        #Fasta file
+#                        
+#                        fasta.path <- file.path(results.path, 
+#                                                "evigene", "okayset",
+#                                                paste0(assembly.nam,
+#                                                       ".okay.aa"))
+#                        
+#                        # Get the quant files for this assembly
+#                        assembly_quant.files <- str_subset(quant_files,
+#                                                           pattern = assembly.nam)
+#                        
+#                        # For each quant file do:
+#                        
+#                        lapply(assembly_quant.files, function(qnt){
+#                          
+#                          # Get the samples mapped in these quant files
+#                          
+#                          sample.nam <- str_extract(qnt,
+#                                                    pattern = sample.pattern)
+#                          
+#                          #Read in the qnt file and add information, including whether the transcripts is a hmmer match.
+#                          read.delim(qnt) %>% 
+#                            mutate(source = str_extract(qnt, '(?<=/salmon/).+(?=/quant.sf)'),
+#                                   sample =  sample.nam,
+#                                   assembly = assembly.nam,
+#                                   file_source = qnt,
+#                                   results_path = results.path,
+#                                   hmmer_path = hmmer.path,
+#                                   # hmmer_match = ifelse(!is_empty(hmmer.list) & Name %in% hmmer.list, 'Yes', 'No'),
+#                                   fasta_path = fasta.path) 
+#                        }) %>% 
+#                          bind_rows %>% 
+#                          # Combine with the HMMer 
+#                          left_join(hmmer_gz.df, by = 'Name')
+#                      }) %>% bind_rows
+#                    }) %>% bind_rows
+
+# quant.df <- mutate(quant.df, hmm_cvrg_perc = (hmm_cvrg/380)*100)
 
 # write_csv(quant.df, path = 'salmonQuant_all.csv')
+
+quant.df <- read_csv(file = 'salmonQuant_all.csv')
 
 #QC: Which sample names are NA:
 # filter(quant.df, is.na(sample)) %>% .$source %>% unique
@@ -239,7 +255,10 @@ quant.df <- lapply(experiment.vec,
 quant_filtered.df <- group_by(quant.df, 
                               assembly,
                               Name) %>% 
-  filter(any(TPM >= 1 & NumReads >= 1))
+  filter(any(TPM >= 1 & NumReads >= 1)) %>% 
+  filter(!is.na(hmm_cvrg) & hmm_cvrg >= 75)
+
+hist(quant_filtered.df$hmm_cvrg_perc, breaks = 1000)
 
 # quant_filtered.df %>% filter(TPM < 1)
 
@@ -248,9 +267,14 @@ quant_filtered.df <- group_by(quant.df,
 # How many genes/pir genes are kept for each assembly
 group_by(quant.df, assembly) %>% 
   summarise(prop = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1])/n_distinct(Name),
-            prop_pir = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1 & hmmer_match == 'Yes'])/n_distinct(Name[hmmer_match == 'Yes']),
-            num_pir = n_distinct(Name[hmmer_match == 'Yes'])) %>% 
-  arrange(prop_pir)
+            prop_pir_tpm = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1 & !is.na(Sequence)])/n_distinct(Name[!is.na(Sequence)]),
+            prop_pir_hmm = 100*n_distinct(Name[hmm_cvrg >= 75 & !is.na(Sequence)])/n_distinct(Name[!is.na(Sequence)]),
+            prop_pir_filt = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1 & !is.na(Sequence) & hmm_cvrg >= 75])/n_distinct(Name[!is.na(Sequence)]),
+            num_pir = n_distinct(Name[!is.na(Sequence)])) %>% 
+  arrange(prop_pir_filt)
+
+experiments <- 'B20-C19-G19-G18-M19-K17'
+assembly.nam <- 'Gunalan19_Sal1_vvx'
 
 ```
 
