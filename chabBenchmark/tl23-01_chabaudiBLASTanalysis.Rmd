@@ -527,6 +527,9 @@ filter(transcriptCvrg_numPoss.df, threshold == 95) %>%
   xlab('Method of transcriptome assembly/meta-assembly') +
   ylab('Percentage of known transcripts that are transcribed') +
   facet_grid(~ threshold + cdhit_thresh, scales = 'free_x'))
+
+# ggsave(filename = '../../plots/chabaudi_numTranscribedPerAssembByCvrg.pdf',
+#        plot = gplot)
 ```
 
 ```{r subfam}
