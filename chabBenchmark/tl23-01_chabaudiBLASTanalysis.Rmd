@@ -127,24 +127,23 @@ blast_files <- c(
 # 
 #                   assembler_name <- str_extract(blast_output_file,
 #                             pattern = 'spadesSC|spadesRNA|trinity|evigene|multiass')
-# 
-#                   cdhit_thresh <- ifelse(grepl(blast_output_file, pattern = 'cdhit'),
-#                                          str_extract(blast_output_file,
-#                                                      pattern = 'cdhit(|est)[[:digit:]]{2}') %>%
-#                                            str_replace(pattern = 'cdhitest', replacement = 'cdhit'),
-#                                          'all')
 #                   
+#                   cdhit_thresh <- case_when(
+#                     grepl(blast_output_file, pattern = 'cdhit') ~ "No Dup",
+#                     grepl(blast_output_file, pattern = 'evigene') ~ "No Dup",
+#                     .default = 'All Seq'
+#                   )
+# 
+#                   # cdhit_thresh <- ifelse(grepl(blast_output_file, pattern = 'cdhit'),
+#                   #                        str_extract(blast_output_file,
+#                   #                                    pattern = 'cdhit(|est)[[:digit:]]{2}') %>%
+#                   #                          str_replace(pattern = 'cdhitest', replacement = 'cdhit'),
+#                   #                        'all')
+# 
 #                   read.table(blast_output_file,
 #                              col.names = outfmt6_headers) %>%
 #                     mutate(geneid = str_extract(sseqid,
 #                                                 pattern = '.+(?=\\.)'),
-#                            # sseqid = unlist(
-#                            #   lapply(
-#                            #     str_extract_all(sseqid,
-#                            #                     pattern = '.+(?=\\.)'),
-#                            #     paste,
-#                            #     collapse = '_')
-#                            # ),
 #                            scovhsp = round( (nident/slen * 100), digits = 2),
 #                            scovs = round(((abs(send - sstart) + 1)/slen *100), digits = 2),
 #                            evalue = format(evalue, scientific = TRUE),
@@ -159,7 +158,7 @@ blast_files <- c(
 #                     group_by(qseqid) %>%
 #                     mutate(num_genes_match =  dplyr::n_distinct(geneid))
 #                 }) %>% dplyr::bind_rows()
-# 
+
 # write_csv(blast,
 #           path = '../../blast/chabaudi_blastp_results.csv')
 
@@ -179,7 +178,7 @@ mutate(blast, sample = paste(sample_name, assembler_name, cdhit_thresh, sep = '_
 sample_names <- unique(str_extract(blast_files,
                             pattern = '(?<=\\/)21659_8.[[:digit:]]{1,2}')) %>%
   str_replace_all(pattern = '#', replacement = '_') %>%
-  str_remove_all(pattern = 'chabaudi_')
+  str_remove_all(pattern = 'chabaudi_') %>% 
 # 
 # assembler_names <- unique(str_extract(blast_files, 
 #                             pattern = 'spadesSC|spadesRNA|trinity|evigene'))
@@ -266,7 +265,7 @@ assembly.col <- c(evigene = 'red',
 ```{r mismatches}
 
 transcriptCvrg_MultiEvi.df <- filter(transcriptCvrg.df, 
-                                     assembler_name == c('evigene') | assembler_name == c('multiass') & cdhit_thresh == 'cdhit95',
+                                     assembler_name == c('evigene') | assembler_name == c('multiass') & cdhit_thresh == 'No Dup',
                                      threshold %in% c(50,95))
 
 ( mismatch.plot <- ggplot(data = transcriptCvrg_MultiEvi.df,
@@ -283,16 +282,15 @@ transcriptCvrg_MultiEvi.df <- filter(transcriptCvrg.df,
 # ggsave(filename = '../../plots/chabaudi_mismatchesPerAssembByCdhit.pdf',
 #        plot = mismatch.plot)
 
-minscovhsp.plot <- ggplot(data = transcriptCvrg_MultiEvi.df,
+( minscovhsp.plot <- ggplot(data = transcriptCvrg_MultiEvi.df,
        aes(y = min_scovhsp,
            # size = num_deNovo,
            x = num_transcripts,
            # col = paste(assembler_name, cdhit_thresh, sep = '_'),
            shape = as.factor(threshold))) +
   geom_jitter(alpha = 0.75, size = 2) +
-  facet_wrap(~ paste0(assembler_name, 
-                     ifelse((cdhit_thresh == 'all'), '', '_cdhit95'))) +
-  theme_classic()
+  facet_wrap(~ paste0(assembler_name)) +
+  theme_classic() )
 
 # ggsave(filename = '../../plots/chabaudi_scovhspPerAssembByCdhit.pdf',
 #        plot = minscovhsp.plot)
@@ -328,12 +326,11 @@ busco.files <- c(
                                   'multiass'),
                            assembler_name)
   
-  cdhit_thresh <- ifelse(grepl(busco.file, pattern = 'cdhit'),
-                         str_extract(busco.file,
-                                     pattern = 'cdhit(|est)(|Multiass)[[:digit:]]{2}') %>%
-                           str_replace(pattern = 'cdhitest', replacement = 'cdhit') %>% 
-                           str_remove(pattern = 'Multiass'),
-                         'none')
+  cdhit_thresh <- case_when(
+                    grepl(busco.file, pattern = 'cdhit') ~ "No Dup",
+                    grepl(busco.file, pattern = 'tl22-03_nfCoreTranscriptCorral') ~ "No Dup",
+                    .default = 'All Seq'
+                  )
   
   read.delim( busco.file, sep = '\t') %>%  mutate(filename = busco.file,
                                                   sample_name = sample_name,
@@ -369,7 +366,7 @@ busco.files <- c(
 
 # ggsave(filename = '../../plots/chabaudi_buscoPerCDHITForAssembly.pdf',
 #        plot = busco.plot)
-
+# 
 # write.xlsx2(
 #   file = '../../supp_files/suppfile_busco.xlsx',
 #   x = busco.df
@@ -422,12 +419,11 @@ fasta.files <- c(
                                                                     'multiass'),
                                                              assembler_name)
                                     
-                                    cdhit_thresh <- ifelse(grepl(fasta.file, pattern = 'cdhit'),
-                                                           str_extract(fasta.file,
-                                                                       pattern = 'cdhit(|est)(|Multiass)[[:digit:]]{2}') %>%
-                                                             str_replace(pattern = 'cdhitest', replacement = 'cdhit') %>% 
-                                                             str_remove(pattern = 'Multiass'),
-                                                           'none')
+                                    cdhit_thresh <- case_when(
+                                      grepl(fasta.file, pattern = 'cdhit') ~ "No Dup",
+                                      grepl(fasta.file, pattern = 'tl22-03_nfCoreTranscriptCorral') ~ "No Dup",
+                                      .default = 'All Seq'
+                                    )
                                     
                                     data.frame(number_transcripts = as.numeric(number_transcripts),
                                                filename = fasta.file,
@@ -437,7 +433,6 @@ fasta.files <- c(
                                   }
   ) %>% bind_rows %>% arrange(desc(number_transcripts))
 )
-
 
 (numTranscript.plot <- ggplot(number_transcripts.df, 
                               aes(x = assembler_name, 
