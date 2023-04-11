@@ -52,6 +52,9 @@ library('plotly')
 library('rmarkdown')
 library('data.table')
 library('xlsx')
+library('ComplexHeatmap')
+library('circlize')
+library('viridis')
 ```
 
 ```{r function_import}
@@ -194,10 +197,8 @@ blast_forcov.df <- blast %>%
   group_by(geneid, blast_name) %>%
   #Choosing this by bitscore, scovhsp or pident may be important
   slice_max(order_by = bitscore, n = 1, with_ties = FALSE) %>%
-  group_by(blast_name,
-           sample_name, assembler_name,
-           cdhit_thresh)
-
+  left_join(mutate(pir.info, geneid = Geneid))
+  
 #define custom function to calculate min
 custom_min <- function(x) {if (length(x)>0) min(x) else NA}
 custom_max <- function(x) {if (length(x)>0) max(x) else NA}
@@ -224,7 +225,7 @@ transcriptCvrg.df <- lapply(c(50,75,90,95,100),
                                                                       pident >= 95])) %>% 
                                 mutate(threshold = threshold) 
                             }) %>% bind_rows()
-# 
+
 transcriptCvrg.df %>% filter(sample_name == '21659_8_16', !is.na(cdhit_thresh), assembler_name == 'multiass')
 # 
 # blast_forcov.df %>% filter(sample_name == '21659_8_16',
@@ -526,6 +527,85 @@ filter(transcriptCvrg_numPoss.df, threshold == 95) %>%
   xlab('Method of transcriptome assembly/meta-assembly') +
   ylab('Percentage of known transcripts that are transcribed') +
   facet_grid(~ threshold + cdhit_thresh, scales = 'free_x'))
+```
+
+```{r subfam}
+#Re-do the number of transcripts found by coverage but this time separated by sub-family.
+transcriptCvrg_subfam.df <- lapply(c(50,75,90,95,100), 
+                            function(threshold){
+                              transcripts_df <- blast_forcov.df %>% 
+                                # filter(scovhsp >= threshold,
+                                # pident >= 95) %>%
+                                group_by(assembler_name, sample_name, cdhit_thresh, subfam) %>% 
+                                summarise(num_transcripts = n_distinct(sseqid[scovhsp >= threshold &
+                                                                                pident >= 95]),
+                                          min_test = custom_min(scovhsp[scovhsp >= threshold &
+                                                                   pident >= 95]),
+                                          num_deNovo = length(qseqid[scovhsp >= threshold &
+                                                                       pident >= 95]),
+                                          med_mismatch = median(mismatch[scovhsp >= threshold &
+                                                                           pident >= 95]),
+                                          med_gap = median(gapopen[scovhsp >= threshold &
+                                                                     pident >= 95]),
+                                          min_scovhsp = custom_min(qcovhsp[scovhsp >= threshold &
+                                                                      pident >= 95]),
+                                          max_scovhsp = custom_max(qcovhsp[scovhsp >= threshold &
+                                                                      pident >= 95])) %>% 
+                                mutate(threshold = threshold) 
+                            }) %>% bind_rows()
+
+# Join the TPM data with the pir gene information, and summarise how many of each subfam are expressed over 1 TPM.
+num_pir_over1_subfam.df <- left_join(tpm_time.df, pir.info, by = 'Geneid') %>% 
+  filter(Geneid %in% pir.info$Gene.ID, !is.na(sample_name)) %>% 
+  group_by(stage_diff_count, sample_name, subfam, time) %>% 
+  summarise(num_pir_over1 = n_distinct(Geneid[tpm >= 1]))
+
+# Combine the above to calculate the percentage of the expressed pirs that are found.
+transcriptCvrg_numPoss_subfam.df <- left_join(transcriptCvrg_subfam.df, 
+                                              num_pir_over1_subfam.df, 
+                                              by = c('subfam','sample_name')) %>% 
+  #Remove the unknown sample
+  filter(sample_name != '21659_8_24') %>% 
+  group_by(assembler_name, sample_name, cdhit_thresh, stage_diff_count, time, threshold, subfam) %>% 
+  summarise(percentage_poss = ifelse(num_pir_over1 > 0,
+                                     round(100*(num_transcripts/num_pir_over1), digits = 2),
+                                     100 + num_transcripts))
+
+lapply(unique(transcriptCvrg_numPoss_subfam.df$assembler_name), function(assembler.nam){
+  #Turn into a matrix shape, ordered by assembly, cd_hit threshold and the stage of the asexual cycle.
+  # Use forcats::as.factor to ensure the ordering during dcast matches the ordering of the melted data frame.
+  transcriptCvrg_numPoss_subfam.mat <- reshape2::dcast(arrange(filter(transcriptCvrg_numPoss_subfam.df, 
+                                                                      threshold == 95, 
+                                                                      assembler_name == assembler.nam,
+                                                                      # subfam != 'ancestral'
+                                                                      ), 
+                                                               assembler_name, cdhit_thresh, time), 
+                                                       forcats::as_factor(paste(
+                                                         # assembler_name, 
+                                                         sample_name, cdhit_thresh, stage_diff_count, 
+                                                         sep = '_')) ~ subfam,
+                                                       value.var = 'percentage_poss')
+  rownames(transcriptCvrg_numPoss_subfam.mat) <- transcriptCvrg_numPoss_subfam.mat[,1]
+  transcriptCvrg_numPoss_subfam.mat <- transcriptCvrg_numPoss_subfam.mat[,-1]
+  
+  ComplexHeatmap::Heatmap(transcriptCvrg_numPoss_subfam.mat, 
+                          cluster_rows = FALSE,
+                          cluster_columns = FALSE,
+                          na_col = 'white',
+                          row_names_gp = gpar(fontsize = 5),
+                          col =  colorRamp2(c(0, 50, 100)/4, viridis(3)))
+})
+
+tmp <- left_join(transcriptCvrg.df, 
+                 summarise(group_by(num_pir_over1_subfam.df,
+                                    stage_diff_count, sample_name, time),
+                           num_pir_over1 = sum(num_pir_over1)), 
+                 by = c('sample_name'))
+lapply(unique(tmp$threshold), function(threshold.val){
+  tmp <- filter(tmp, threshold == threshold.val)
+  plot(tmp$num_pir_over1, tmp$num_transcripts, main = threshold.val)
+})
+
 ```
 
 
