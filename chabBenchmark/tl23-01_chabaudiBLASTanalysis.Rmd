@@ -352,7 +352,7 @@ busco.files <- c(
     theme_classic() +
     theme(axis.text.x = element_blank(),
           axis.title.y = element_text(size = 8)) +
-    scale_color_manual(values = assembly.col) +
+    scale_color_manual(values = assembly.col, name = 'Assembly') +
     xlab('Method of transcriptome assembly/meta-assembly') +
     ylab('Number of Complete Plasmodiium BUSCOs found') +
     facet_grid(~ cdhit_thresh, scales = 'free_x'))
@@ -364,11 +364,11 @@ busco.files <- c(
     geom_boxplot() +
     theme_classic() +
     theme(axis.text.x = element_blank()) +
-    scale_color_manual(values = assembly.col) +
+    scale_color_manual(values = assembly.col, name = 'Assembly') +
     xlab('Method of transcriptome assembly/meta-assembly') +
     ylab('Ratio of duplicate/complete Plasmodiium BUSCOs found') +
     facet_grid(~ cdhit_thresh, scales = 'free_x'))
-# 
+
 # ggsave(filename = '../../plots/chabaudi_buscoPerCDHITForAssembly.pdf',
 #        plot = busco.plot,
 #        height = 3)
@@ -450,6 +450,10 @@ fasta.files <- c(
 #   x = number_transcripts.df
 # )
 
+#Need to set the factor levels for this plot as it is different to the others for some reason.
+levels(number_transcripts.df$assembler_name) <- ordering(levels(number_transcripts.df$assembler_name),
+                                                         "evigene")
+
 (numTranscript.plot <- ggplot(number_transcripts.df, 
                               aes(x = assembler_name, 
                                   y = log1p(number_transcripts),
@@ -457,15 +461,14 @@ fasta.files <- c(
     geom_boxplot() +
     theme_classic() +
     theme(axis.text.x = element_blank()) +
-    
-    scale_color_manual(values = assembly.col) +
+    scale_color_manual(values = assembly.col, name = 'Assembly') +
     xlab('Method of transcriptome assembly/meta-assembly') +
     ylab('Log Total number of transcripts + 1') +
     facet_grid(~ cdhit_thresh, scales = 'free_x'))
 
 # ggsave(filename = '../../plots/chabaudi_numTranscriptPerCDHITForAssembly.pdf',
-# plot = numTranscript.plot,
-# height = 3)
+#        plot = numTranscript.plot,
+#        height = 3)
 ```
 
 ```{r tpm}
@@ -535,7 +538,7 @@ filter(transcriptCvrg_numPoss.df, threshold == 95) %>%
   geom_boxplot() +
   theme_classic() +
   theme(axis.text.x = element_blank()) +
-  scale_color_manual(values = assembly.col) +
+  scale_color_manual(values = assembly.col, name = 'Assembly') +
   xlab('Method of transcriptome assembly/meta-assembly') +
   ylab('Percentage of known transcripts that are transcribed') +
   facet_grid(~ threshold + cdhit_thresh, scales = 'free_x'))
