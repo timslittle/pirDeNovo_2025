@@ -451,8 +451,9 @@ fasta.files <- c(
 # )
 
 #Need to set the factor levels for this plot as it is different to the others for some reason.
-levels(number_transcripts.df$assembler_name) <- ordering(levels(number_transcripts.df$assembler_name),
-                                                         "evigene")
+number_transcripts.df$assembler_name <- factor(number_transcripts.df$assembler_name,
+                                               ordering(levels(number_transcripts.df$assembler_name),
+                                                        "evigene"))
 
 (numTranscript.plot <- ggplot(number_transcripts.df, 
                               aes(x = assembler_name, 
@@ -466,9 +467,9 @@ levels(number_transcripts.df$assembler_name) <- ordering(levels(number_transcrip
     ylab('Log Total number of transcripts + 1') +
     facet_grid(~ cdhit_thresh, scales = 'free_x'))
 
-# ggsave(filename = '../../plots/chabaudi_numTranscriptPerCDHITForAssembly.pdf',
-#        plot = numTranscript.plot,
-#        height = 3)
+ggsave(filename = '../../plots/chabaudi_numTranscriptPerCDHITForAssembly.pdf',
+       plot = numTranscript.plot,
+       height = 3)
 ```
 
 ```{r tpm}
