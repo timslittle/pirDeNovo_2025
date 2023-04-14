@@ -300,6 +300,8 @@ transcriptCvrg_MultiEvi.df <- filter(transcriptCvrg.df,
 
 # BUSCO scores
 
+Removing '21659_8_19' from the results since it's BUSCO score is particularly low and skews the plot.
+
 ```{r busco}
 #Get the BUSCO files
 busco.files <- c(
@@ -342,30 +344,31 @@ busco.files <- c(
     arrange(desc(Complete))
 )
 
-(busco.plot <- ggplot(busco.df, 
+(busco.plot <- ggplot(filter(busco.df, sample_name != '21659_8_19'), 
                       aes(x = assembler_name, 
                           y = Complete,
                           col = assembler_name)) +
     geom_boxplot() +
     theme_classic() +
-    theme(axis.text.x = element_blank()) +
+    theme(axis.text.x = element_blank(),
+          axis.title.y = element_text(size = 8)) +
     scale_color_manual(values = assembly.col) +
     xlab('Method of transcriptome assembly/meta-assembly') +
     ylab('Number of Complete Plasmodiium BUSCOs found') +
     facet_grid(~ cdhit_thresh, scales = 'free_x'))
 
-(busco_prop.plot <- ggplot(busco.df, 
-                aes(x = assembler_name, 
-                    y = Duplicated/Complete,
-                    col = assembler_name)) +
-  geom_boxplot() +
-  theme_classic() +
-  theme(axis.text.x = element_blank()) +
-  scale_color_manual(values = assembly.col) +
-  xlab('Method of transcriptome assembly/meta-assembly') +
-  ylab('Ratio of duplicate/complete Plasmodiium BUSCOs found') +
+(busco_prop.plot <- ggplot(filter(busco.df, sample_name != '21659_8_19'), 
+                           aes(x = assembler_name, 
+                               y = Duplicated/Complete,
+                               col = assembler_name)) +
+    geom_boxplot() +
+    theme_classic() +
+    theme(axis.text.x = element_blank()) +
+    scale_color_manual(values = assembly.col) +
+    xlab('Method of transcriptome assembly/meta-assembly') +
+    ylab('Ratio of duplicate/complete Plasmodiium BUSCOs found') +
     facet_grid(~ cdhit_thresh, scales = 'free_x'))
-
+# 
 # ggsave(filename = '../../plots/chabaudi_buscoPerCDHITForAssembly.pdf',
 #        plot = busco.plot,
 #        height = 3)
