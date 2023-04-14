@@ -367,7 +367,8 @@ busco.files <- c(
     facet_grid(~ cdhit_thresh, scales = 'free_x'))
 
 # ggsave(filename = '../../plots/chabaudi_buscoPerCDHITForAssembly.pdf',
-#        plot = busco.plot)
+#        plot = busco.plot,
+#        height = 3)
 
 # write.xlsx2(
 #   file = '../../supp_files/suppfile_busco.xlsx',
@@ -460,7 +461,8 @@ fasta.files <- c(
     facet_grid(~ cdhit_thresh, scales = 'free_x'))
 
 # ggsave(filename = '../../plots/chabaudi_numTranscriptPerCDHITForAssembly.pdf',
-#        plot = numTranscript.plot)
+# plot = numTranscript.plot,
+# height = 3)
 ```
 
 ```{r tpm}
@@ -523,7 +525,7 @@ transcriptCvrg_numPoss.df <- left_join(transcriptCvrg.df, num_pir_over1.df, by =
 filter(transcriptCvrg_numPoss.df, threshold == 95) %>% 
   arrange(desc(percentage_poss))
 
-(gplot <- ggplot(filter(transcriptCvrg_numPoss.df, threshold %in% c(50,95)), 
+(gtrans_plot <- ggplot(filter(transcriptCvrg_numPoss.df, threshold %in% c(50,95)), 
                 aes(x = assembler_name, 
                     y = percentage_poss,
                     col = assembler_name)) +
@@ -536,7 +538,8 @@ filter(transcriptCvrg_numPoss.df, threshold == 95) %>%
   facet_grid(~ threshold + cdhit_thresh, scales = 'free_x'))
 
 # ggsave(filename = '../../plots/chabaudi_numTranscribedPerAssembByCvrg.pdf',
-#        plot = gplot)
+#        plot = gtrans_plot,
+#        height = 4)
 ```
 
 ```{r subfam}
