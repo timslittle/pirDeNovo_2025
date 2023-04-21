@@ -232,24 +232,23 @@ quant_filtered.df <- group_by(quant.df,
   filter(any(TPM >= 1 & NumReads >= 1)) %>% 
   filter(!is.na(hmm_cvrg) & hmm_cvrg_perc >= 75)
 
-hist(quant_filtered.df$hmm_cvrg_perc, breaks = 1000)
+hist(na.omit(quant.df$hmm_cvrg_perc), breaks = 1000)
+hist(quant_filtered.df$hmm_cvrg_perc, breaks = 100)
 
 # quant_filtered.df %>% filter(TPM < 1)
 
 # write_csv(quant_filtered.df, path = 'salmonQuant_filtered.csv')
 
 # How many genes/pir genes are kept for each assembly
-group_by(quant.df, assembly) %>% 
-  summarise(prop = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1])/n_distinct(Name),
+quant_stats.df <- group_by(quant.df, assembly) %>% 
+  summarise(prop_all = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1])/n_distinct(Name),
+            num_pir = n_distinct(Name[!is.na(Sequence)]),
             prop_pir_tpm = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1 & !is.na(Sequence)])/n_distinct(Name[!is.na(Sequence)]),
-            prop_pir_hmm = 100*n_distinct(Name[hmm_cvrg >= 75 & !is.na(Sequence)])/n_distinct(Name[!is.na(Sequence)]),
-            prop_pir_filt = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1 & !is.na(Sequence) & hmm_cvrg >= 75])/n_distinct(Name[!is.na(Sequence)]),
-            num_pir = n_distinct(Name[!is.na(Sequence)])) %>% 
+            prop_pir_hmm = 100*n_distinct(Name[hmm_cvrg_perc >= 75 & !is.na(Sequence)])/n_distinct(Name[!is.na(Sequence)]),
+            prop_pir_filt = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1 & !is.na(Sequence) & hmm_cvrg_perc >= 75])/n_distinct(Name[!is.na(Sequence)]),
+            num_pir_filt = n_distinct(Name[TPM >= 1 & NumReads >= 1 & !is.na(Sequence) & hmm_cvrg_perc >= 75])) %>% 
   arrange(prop_pir_filt)
-
-experiments <- 'B20-C19-G19-G18-M19-K17'
-assembly.nam <- 'Gunalan19_Sal1_vvx'
-
+arrange(quant_stats.df, num_pir_filt)
 ```
 
 Extract the fasta files of pirs expressed above threshold.
