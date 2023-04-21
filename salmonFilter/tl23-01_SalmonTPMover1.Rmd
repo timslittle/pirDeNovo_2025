@@ -200,7 +200,6 @@ quant.df <- lapply(assemblies.list,
                                 file_source = qnt,
                                 # results_path = results.path,
                                 hmmer_path = hmmer_gz.path,
-                                hmm_cvrg_perc = (hmm_cvrg/380)*100,
                                 fasta_path = fasta.path)
                      }) %>%
                        bind_rows %>%
@@ -208,7 +207,7 @@ quant.df <- lapply(assemblies.list,
                        left_join(hmmer_gz.df, by = 'Name')
                      }) %>% bind_rows
 
-# quant.df <- mutate(quant.df, hmm_cvrg_perc = (hmm_cvrg/380)*100)
+quant.df <- mutate(quant.df, hmm_cvrg_perc = (hmm_cvrg/380)*100)
 
 # write_csv(quant.df, path = 'salmonQuant_all.csv')
 
@@ -228,6 +227,7 @@ quant.df <- lapply(assemblies.list,
 #. i.e. Filter out every transcript with at least one sample with >= 1 TPM/NumReads.
 quant_filtered.df <- group_by(quant.df, 
                               assembly,
+                              fasta_path,
                               Name) %>% 
   filter(any(TPM >= 1 & NumReads >= 1)) %>% 
   filter(!is.na(hmm_cvrg) & hmm_cvrg_perc >= 75)
@@ -240,21 +240,38 @@ hist(quant_filtered.df$hmm_cvrg_perc, breaks = 100)
 # write_csv(quant_filtered.df, path = 'salmonQuant_filtered.csv')
 
 # How many genes/pir genes are kept for each assembly
-quant_stats.df <- group_by(quant.df, assembly) %>% 
-  summarise(prop_all = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1])/n_distinct(Name),
-            num_pir = n_distinct(Name[!is.na(Sequence)]),
-            prop_pir_tpm = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1 & !is.na(Sequence)])/n_distinct(Name[!is.na(Sequence)]),
-            prop_pir_hmm = 100*n_distinct(Name[hmm_cvrg_perc >= 75 & !is.na(Sequence)])/n_distinct(Name[!is.na(Sequence)]),
-            prop_pir_filt = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1 & !is.na(Sequence) & hmm_cvrg_perc >= 75])/n_distinct(Name[!is.na(Sequence)]),
-            num_pir_filt = n_distinct(Name[TPM >= 1 & NumReads >= 1 & !is.na(Sequence) & hmm_cvrg_perc >= 75])) %>% 
-  arrange(prop_pir_filt)
-arrange(quant_stats.df, num_pir_filt)
+( quant_stats.df <- group_by(quant.df, assembly) %>% 
+    summarise(prop_all = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1])/n_distinct(Name),
+              num_pir = n_distinct(Name[!is.na(Sequence)]),
+              prop_pir_tpm = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1 & !is.na(Sequence)])/n_distinct(Name[!is.na(Sequence)]),
+              prop_pir_hmm = 100*n_distinct(Name[hmm_cvrg_perc >= 75 & !is.na(Sequence)])/n_distinct(Name[!is.na(Sequence)]),
+              prop_pir_filt = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1 & !is.na(Sequence) & hmm_cvrg_perc >= 75])/n_distinct(Name[!is.na(Sequence)]),
+              num_pir_filt = n_distinct(Name[TPM >= 1 & NumReads >= 1 & !is.na(Sequence) & hmm_cvrg_perc >= 75])) %>% 
+    arrange(prop_pir_filt) )
+arrange(quant_stats.df, assembly)
+mutate(quant_stats.df,expt = str_extract(assembly, pattern = '^[[:alpha:]]+[[:digit:]]{2}(?=_)')) %>% 
+  group_by(expt) %>% summarise(num_pir_filt = sum(num_pir_filt)) %>% arrange(num_pir_filt) 
+# %>% .$num_pir_filt %>% sum()
+sum(quant_stats.df$num_pir_filt)
 ```
 
-Extract the fasta files of pirs expressed above threshold.
+Extract the fasta files of pirs expressed above threshold. 
 
 ```{r fasta}
-
+#Note that this function appends to an existing file so be sure to remove it if it already exists.
+#Save date for file name.
+date.str <- format(Sys.time(), "%d%b")
+lapply(unique(quant_filtered.df$fasta_path),
+       function(fasta.path){
+         pir_names <- unique(filter(quant_filtered.df, 
+                                    fasta_path == fasta.path)$Name)
+         assembly_nam <- unique(filter(quant_filtered.df, 
+                                       fasta_path == fasta.path)$assembly)
+         fasta.fa <- read.fasta(fasta.path)
+         fasta_pir.fa <- fasta.fa[getName(fasta.fa) %in% pir_names]
+         write.fasta(fasta_pir.fa, names = paste0(getName(fasta_pir.fa), '_', assembly_nam),
+                     file.out = paste0('../../deNovoPirs/deNovoPirs_',date.str,'.fasta'), open = 'a')
+       }) 
 ```
 
 
