@@ -225,12 +225,12 @@ quant.df <- lapply(assemblies.list,
 
 ```{r quant_filtered}
 # Grouping by each assembly and transcript, which transcripts have TPM and NumReads < 1 TPM in every sample.
-#. i.e. Filter out every transcript with at leas one sample with >= 1 TPM/NumReads.
+#. i.e. Filter out every transcript with at least one sample with >= 1 TPM/NumReads.
 quant_filtered.df <- group_by(quant.df, 
                               assembly,
                               Name) %>% 
   filter(any(TPM >= 1 & NumReads >= 1)) %>% 
-  filter(!is.na(hmm_cvrg) & hmm_cvrg >= 75)
+  filter(!is.na(hmm_cvrg) & hmm_cvrg_perc >= 75)
 
 hist(quant_filtered.df$hmm_cvrg_perc, breaks = 1000)
 
