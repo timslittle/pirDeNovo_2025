@@ -261,26 +261,48 @@ Extract the fasta files of pirs expressed above threshold.
 ```{r fasta}
 #Note that this function appends to an existing file so be sure to remove it if it already exists.
 #Save date for file name.
-date.str <- format(Sys.time(), "%d%b")
-lapply(unique(quant_filtered.df$fasta_path),
-       function(fasta.path){
-         pir_names <- unique(filter(quant_filtered.df, 
-                                    fasta_path == fasta.path)$Name)
-         assembly_nam <- unique(filter(quant_filtered.df, 
-                                       fasta_path == fasta.path)$assembly)
-         fasta.fa <- read.fasta(fasta.path)
-         fasta_pir.fa <- fasta.fa[getName(fasta.fa) %in% pir_names]
-         write.fasta(fasta_pir.fa, names = paste0(getName(fasta_pir.fa), '_', assembly_nam),
-                     file.out = paste0('../../deNovoPirs/deNovoPirs_',date.str,'.fasta'), open = 'a')
-       }) 
+# date.str <- format(Sys.time(), "%d%b")
+# lapply(unique(quant_filtered.df$fasta_path),
+#        function(fasta.path){
+#          pir_names <- unique(filter(quant_filtered.df, 
+#                                     fasta_path == fasta.path)$Name)
+#          assembly_nam <- unique(filter(quant_filtered.df, 
+#                                        fasta_path == fasta.path)$assembly)
+#          fasta.fa <- read.fasta(fasta.path)
+#          fasta_pir.fa <- fasta.fa[getName(fasta.fa) %in% pir_names]
+#          write.fasta(fasta_pir.fa, names = paste0(getName(fasta_pir.fa), '_', assembly_nam),
+#                      file.out = paste0('../../deNovoPirs/deNovoPirs_',date.str,'.fasta'), open = 'a')
+#        }) 
 ```
 
-Make the node.df file for graph design.
+Make the node.df file for graph design. Using the concatenated fasta file of the above filtered de novo pirs and reference gene pirs.
 
 ```{r nodes}
-
+lopez13_sal1Subfam <- read.table('../../../tl22-02_VirSubfamNetwork/pir_info/lopez13_vir_subfam.txt', 
+                                 col.names = c('Name','subfam'),
+                                 stringsAsFactors = FALSE)
+deNovo_Ref_pirs.list <- getName(read.fasta(file = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho.fasta'))
+subfam.df <- data.frame(Name = deNovo_Ref_pirs.list,
+                        subfam = case_when(
+                          grepl(deNovo_Ref_pirs.list, pattern = 'Nonam') ~ "de_novo",
+                          grepl(deNovo_Ref_pirs.list, pattern = 'PVX') ~ "vvxSal1",
+                          grepl(deNovo_Ref_pirs.list, pattern = 'P01') ~ "vvxP01",
+                          grepl(deNovo_Ref_pirs.list, pattern = 'PVW1') ~ "vvxW1",
+                          grepl(deNovo_Ref_pirs.list, pattern = 'PCYB') ~ "cynoB",
+                          grepl(deNovo_Ref_pirs.list, pattern = 'PcyM') ~ "cynoM",
+                          grepl(deNovo_Ref_pirs.list, pattern = 'Poc') ~ "ovale",
+                          grepl(deNovo_Ref_pirs.list, pattern = 'PKA1') ~ "knowlA",
+                          grepl(deNovo_Ref_pirs.list, pattern = 'PKNOH') ~ "knowlH",
+                          grepl(deNovo_Ref_pirs.list, pattern = 'PKNH') ~ "knowlM",
+                          grepl(deNovo_Ref_pirs.list, pattern = 'PmUG01') ~ "malar",
+                          grepl(deNovo_Ref_pirs.list, pattern = 'PVL') ~ "vvxlike",
+                          grepl(deNovo_Ref_pirs.list, pattern = 'PCOAH') ~ "coat",
+                          grepl(deNovo_Ref_pirs.list, pattern = 'MKS88') ~ "bras"),
+                        stringsAsFactors = FALSE) %>%
+  mutate(subfam = ifelse(subfam == 'vvxSal1' & Name %in% lopez13_sal1Subfam$Name, 
+                         as.character(lopez13_sal1Subfam$subfam[lopez13_sal1Subfam$Name %in% Name]),
+                         subfam))
 ```
-
 
 ```{r node-df_tpmvalues}
 
