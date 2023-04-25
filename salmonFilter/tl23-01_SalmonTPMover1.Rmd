@@ -277,7 +277,7 @@ Extract the fasta files of pirs expressed above threshold.
 
 Make the node.df file for graph design. Using the concatenated fasta file of the above filtered de novo pirs and reference gene pirs.
 
-```{r nodes}
+```{r subfam}
 lopez13_sal1Subfam <- read.table('../../../tl22-02_VirSubfamNetwork/pir_info/lopez13_vir_subfam.txt', 
                                  col.names = c('Name','subfam'),
                                  stringsAsFactors = FALSE)
@@ -297,11 +297,14 @@ subfam.df <- data.frame(Name = deNovo_Ref_pirs.list,
                           grepl(deNovo_Ref_pirs.list, pattern = 'PmUG01') ~ "malar",
                           grepl(deNovo_Ref_pirs.list, pattern = 'PVL') ~ "vvxlike",
                           grepl(deNovo_Ref_pirs.list, pattern = 'PCOAH') ~ "coat",
-                          grepl(deNovo_Ref_pirs.list, pattern = 'MKS88') ~ "bras"),
+                          grepl(deNovo_Ref_pirs.list, pattern = 'MKS88') ~ "brasl"),
                         stringsAsFactors = FALSE) %>%
   mutate(subfam = ifelse(subfam == 'vvxSal1' & Name %in% lopez13_sal1Subfam$Name, 
                          as.character(lopez13_sal1Subfam$subfam[lopez13_sal1Subfam$Name %in% Name]),
                          subfam))
+
+write_csv(subfam.df,
+          path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_Sal1subfam.csv')
 ```
 
 ```{r node-df_tpmvalues}
