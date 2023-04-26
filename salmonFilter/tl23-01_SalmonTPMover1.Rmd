@@ -335,8 +335,8 @@ gephi.df <- mutate(subfam.df,
   left_join(quant_filtered_sequence.df, by = c('Name_assembly')) %>% 
   relocate(Id, label)
 
-write_csv(subfam.df,
-          path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_infox.csv')
+write_csv(gephi.df,
+          path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_info.csv')
 
 blast.df <- read.table('../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_all2all.blast',
                       col.names = unlist(strsplit(c('qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs qcovhsp slen nident'), split = ' ')))
@@ -378,6 +378,9 @@ edges.df <- mutate(blast_filt_dedup.df,
        Target = gephi.df$Id[match(sseqid, gephi.df$label)],
        Type = 'undirected') %>% 
   select(Source, Target, Type)
+
+write.csv(edges.df, 
+          '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_edges.csv')
 
 ```
 
