@@ -279,7 +279,7 @@ Make the node.df file for graph design. Using the concatenated fasta file of the
 
 ```{r subfam}
 lopez13_sal1Subfam <- read.table('../../../tl22-02_VirSubfamNetwork/pir_info/lopez13_vir_subfam.txt', 
-                                 col.names = c('Name','subfam'),
+                                 col.names = c('name','subfam'),
                                  stringsAsFactors = FALSE)
 deNovo_Ref_pirs.list <- getName(read.fasta(file = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho.fasta'))
 subfam.df <- data.frame(Name = deNovo_Ref_pirs.list,
@@ -300,12 +300,40 @@ subfam.df <- data.frame(Name = deNovo_Ref_pirs.list,
                         stringsAsFactors = FALSE) %>%
   mutate(species = ifelse(subfam == 'de_novo',
                           'vvx',
-                          str_extract(subfam, pattern = '^[[:lower:]]+')),
-         subfam = ifelse(
-           subfam == 'vvxSal1' & Name %in% lopez13_sal1Subfam$Name, 
-           as.character(lopez13_sal1Subfam$subfam[lopez13_sal1Subfam$Name %in% Name]),
-           subfam)
+                          str_extract(subfam, pattern = '^[[:lower:]]+'))
   )
+
+subfam.df$subfam[grepl(subfam.df$Name, pattern = 'PVX')] <- sapply(str_subset(subfam.df$Name, pattern = 'PVX'), 
+                                                                    function(sal1_id) {
+                                                                      if(sal1_id %in% lopez13_sal1Subfam$name) {
+                                                                        lopez13_sal1Subfam$subfam[which(lopez13_sal1Subfam$name %in% sal1_id)]
+                                                                      } else {
+                                                                        'vvxSal1'
+                                                                      }
+                                                                    })
+
+# Test subfam assignment
+# left_join(lopez13_sal1Subfam, mutate(subfam.df, name = Name), by = 'name')
+
+
+arrange(tmp,Name)[1,] %>% 
+  # filter(Name == 'PVX_001610') %>% 
+  mutate(subfam = if_else(any(lopez13_sal1Subfam$Name %in% Name), lopez13_sal1Subfam$subfam[which(lopez13_sal1Subfam$Name %in% Name)], subfam))
+
+tmpid <- tmp$Name
+
+ifelse(tmpid %in% lopez13_sal1Subfam$name, which(lopez13_sal1Subfam$name %in% tmpid), 'poo')
+
+sapply(sort(tmpid), 
+       function(tmp_id) {
+         if(tmp_id %in% lopez13_sal1Subfam$name) {
+           lopez13_sal1Subfam$subfam[which(lopez13_sal1Subfam$name %in% tmp_id)]
+         } else {
+           'vvxSal1'
+         }
+       }) %>% cbind %>% data.frame
+
+arrange(lopez13_sal1Subfam, name)
 
 write_csv(subfam.df,
           path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_Sal1subfam.csv')
@@ -379,7 +407,7 @@ edges.df <- mutate(blast_filt_dedup.df,
        Type = 'undirected') %>% 
   select(Source, Target, Type)
 
-write.csv(edges.df, 
+write_csv(edges.df, 
           '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_edges.csv')
 
 ```
