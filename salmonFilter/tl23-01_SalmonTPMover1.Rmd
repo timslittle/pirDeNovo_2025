@@ -283,29 +283,104 @@ lopez13_sal1Subfam <- read.table('../../../tl22-02_VirSubfamNetwork/pir_info/lop
                                  stringsAsFactors = FALSE)
 deNovo_Ref_pirs.list <- getName(read.fasta(file = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho.fasta'))
 subfam.df <- data.frame(Name = deNovo_Ref_pirs.list,
-                        subfam = case_when(
-                          grepl(deNovo_Ref_pirs.list, pattern = 'Nonam') ~ "de_novo",
-                          grepl(deNovo_Ref_pirs.list, pattern = 'PVX') ~ "vvxSal1",
-                          grepl(deNovo_Ref_pirs.list, pattern = 'P01') ~ "vvxP01",
-                          grepl(deNovo_Ref_pirs.list, pattern = 'PVW1') ~ "vvxW1",
-                          grepl(deNovo_Ref_pirs.list, pattern = 'PCYB') ~ "cynoB",
-                          grepl(deNovo_Ref_pirs.list, pattern = 'PcyM') ~ "cynoM",
-                          grepl(deNovo_Ref_pirs.list, pattern = 'Poc') ~ "ovale",
-                          grepl(deNovo_Ref_pirs.list, pattern = 'PKA1') ~ "knowlA",
-                          grepl(deNovo_Ref_pirs.list, pattern = 'PKNOH') ~ "knowlH",
-                          grepl(deNovo_Ref_pirs.list, pattern = 'PKNH') ~ "knowlM",
-                          grepl(deNovo_Ref_pirs.list, pattern = 'PmUG01') ~ "malar",
-                          grepl(deNovo_Ref_pirs.list, pattern = 'PVL') ~ "vvxlike",
-                          grepl(deNovo_Ref_pirs.list, pattern = 'PCOAH') ~ "coat",
-                          grepl(deNovo_Ref_pirs.list, pattern = 'MKS88') ~ "brasl"),
+                        subfam = case_when(grepl(deNovo_Ref_pirs.list, pattern = 'Nonam') ~ "de_novo",
+                                           grepl(deNovo_Ref_pirs.list, pattern = 'PVX') ~ "vvxSal1",
+                                           grepl(deNovo_Ref_pirs.list, pattern = 'P01') ~ "vvxP01",
+                                           grepl(deNovo_Ref_pirs.list, pattern = 'PVW1') ~ "vvxW1",
+                                           grepl(deNovo_Ref_pirs.list, pattern = 'PCYB') ~ "cynoB",
+                                           grepl(deNovo_Ref_pirs.list, pattern = 'PcyM') ~ "cynoM",
+                                           grepl(deNovo_Ref_pirs.list, pattern = 'Poc') ~ "ovale",
+                                           grepl(deNovo_Ref_pirs.list, pattern = 'PKA1') ~ "knowlA",
+                                           grepl(deNovo_Ref_pirs.list, pattern = 'PKNOH') ~ "knowlH",
+                                           grepl(deNovo_Ref_pirs.list, pattern = 'PKNH') ~ "knowlM",
+                                           grepl(deNovo_Ref_pirs.list, pattern = 'PmUG01') ~ "malar",
+                                           grepl(deNovo_Ref_pirs.list, pattern = 'PVL') ~ "vvxlike",
+                                           grepl(deNovo_Ref_pirs.list, pattern = 'PCOAH') ~ "coat",
+                                           grepl(deNovo_Ref_pirs.list, pattern = 'MKS88') ~ "brasl"),
                         stringsAsFactors = FALSE) %>%
-  mutate(subfam = ifelse(subfam == 'vvxSal1' & Name %in% lopez13_sal1Subfam$Name, 
-                         as.character(lopez13_sal1Subfam$subfam[lopez13_sal1Subfam$Name %in% Name]),
-                         subfam))
+  mutate(species = ifelse(subfam == 'de_novo',
+                          'vvx',
+                          str_extract(subfam, pattern = '^[[:lower:]]+')),
+         subfam = ifelse(
+           subfam == 'vvxSal1' & Name %in% lopez13_sal1Subfam$Name, 
+           as.character(lopez13_sal1Subfam$subfam[lopez13_sal1Subfam$Name %in% Name]),
+           subfam)
+  )
 
 write_csv(subfam.df,
           path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_Sal1subfam.csv')
 ```
+
+Preparing the data for Gephi input requires some special treatment, including making a number for each node.
+
+```{r gephi}
+# Get the median TPM and NumReads for each assembly de novo pir
+quant_filtered_sequence.df <-  mutate(quant_filtered.df, 
+                                      Name_assembly = paste0(Name, '_', assembly)) %>% 
+  # Grouping over all variables except those that are sample specific (as opposed to assembly specific)
+  group_by(pick(!matches(c('source|sample|file_source|TPM|NumReads|EffectiveLength')))) %>% 
+  summarise(TPM_med = median(TPM),
+            TPM_max = max(TPM),
+            TPM_min = min(TPM),
+            NumReads_med = median(NumReads),
+            NumReads_max = max(NumReads),
+            NumReads_min = min(NumReads))
+
+gephi.df <- mutate(subfam.df, 
+                   Id = seq_along(Name),
+                   label = Name,
+                   subfam = subfam,
+                   Name_assembly = Name) %>% 
+  select(-Name) %>% 
+  left_join(quant_filtered_sequence.df, by = c('Name_assembly')) %>% 
+  relocate(Id, label)
+
+write_csv(subfam.df,
+          path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_infox.csv')
+
+blast.df <- read.table('../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_all2all.blast',
+                      col.names = unlist(strsplit(c('qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs qcovhsp slen nident'), split = ' ')))
+
+# Duplicate removal removes many more than expected due to multiple different alignments from the same sequences.
+#   TODO: How should I deal with these? Would be ideal to combine but this would take a while. May take lazy way out and just take the best match.
+
+# Could make this faster by arranging by assembly and then saving the qseqid instances and removing the sseqid instances of each assembly going down the data frame.
+
+#Remove self-matches.
+blast_filt.df <- blast.df[apply(blast.df[,1:2], 1, function(x) if(x[1] == x[2]) FALSE else TRUE),]
+
+#Arrange by e-value so the best matches come to the top.
+blast_filt.df <- arrange(blast_filt.df, evalue)
+
+blast_filt_dup <- apply(blast_filt.df[,1:2],1,sort) %>% t %>% duplicated
+sum(blast_filt_dup)
+
+blast_filt_dedup.df <- blast_filt.df[!blast_filt_dup,]
+
+pattern_filter <- 'NonamEVm000789t1_Cheng19_ERX2560129-ERR2541711_vvx|PVP01_0600400'
+pattern_filter <- 'PcyM_1354500|PocGH01_00134500'
+pattern_filter <- 'PVP01_0003840|PVW1_140089200'
+
+filter(blast_filt_dedup.df, 
+       grepl(qseqid, 
+             pattern = pattern_filter), 
+       grepl(sseqid, 
+             pattern = pattern_filter))
+
+filter(blast.df, 
+       grepl(qseqid, 
+                       pattern = pattern_filter), 
+       grepl(sseqid, 
+             pattern = pattern_filter))
+
+edges.df <- mutate(blast_filt_dedup.df, 
+       Source = gephi.df$Id[match(qseqid, gephi.df$label)],
+       Target = gephi.df$Id[match(sseqid, gephi.df$label)],
+       Type = 'undirected') %>% 
+  select(Source, Target, Type)
+
+```
+
 
 ```{r node-df_tpmvalues}
 
