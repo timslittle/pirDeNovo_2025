@@ -315,26 +315,6 @@ subfam.df$subfam[grepl(subfam.df$Name, pattern = 'PVX')] <- sapply(str_subset(su
 # Test subfam assignment
 # left_join(lopez13_sal1Subfam, mutate(subfam.df, name = Name), by = 'name')
 
-
-arrange(tmp,Name)[1,] %>% 
-  # filter(Name == 'PVX_001610') %>% 
-  mutate(subfam = if_else(any(lopez13_sal1Subfam$Name %in% Name), lopez13_sal1Subfam$subfam[which(lopez13_sal1Subfam$Name %in% Name)], subfam))
-
-tmpid <- tmp$Name
-
-ifelse(tmpid %in% lopez13_sal1Subfam$name, which(lopez13_sal1Subfam$name %in% tmpid), 'poo')
-
-sapply(sort(tmpid), 
-       function(tmp_id) {
-         if(tmp_id %in% lopez13_sal1Subfam$name) {
-           lopez13_sal1Subfam$subfam[which(lopez13_sal1Subfam$name %in% tmp_id)]
-         } else {
-           'vvxSal1'
-         }
-       }) %>% cbind %>% data.frame
-
-arrange(lopez13_sal1Subfam, name)
-
 write_csv(subfam.df,
           path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_Sal1subfam.csv')
 ```
@@ -365,6 +345,9 @@ gephi.df <- mutate(subfam.df,
 
 write_csv(gephi.df,
           path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_info.csv')
+```
+
+```{r node}
 
 blast.df <- read.table('../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_all2all.blast',
                       col.names = unlist(strsplit(c('qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs qcovhsp slen nident'), split = ' ')))
