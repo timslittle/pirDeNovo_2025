@@ -343,7 +343,21 @@ gephi.df <- mutate(subfam.df,
   left_join(quant_filtered_sequence.df, by = c('Name_assembly')) %>% 
   relocate(Id, label)
 
-write_csv(gephi.df,
+```
+
+```{r mcl}
+mcl.files <- list.files(path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_mcl',
+           pattern = 'deNovoPirs-23Apr_pirsVvxVvxOrtho_all2all.mci.I.+list',
+           full.names = TRUE)
+#Read in the mcl files and combine them by the name using Reduce to apply full_join across the list.
+mcl.df <- lapply(mcl.files, function(mcl_file){
+  mcl_infl <- str_extract(mcl_file, pattern = '(?<=\\.)I.+(?=\\.list$)')
+  read.table(mcl_file, col.names = c('label', mcl_infl))
+}) %>% Reduce(function(x,y) full_join(x,y, by = c('label')), .)
+
+gephi_mcl.df <- full_join(gephi.df, mcl.df, by = 'label')
+
+write_csv(gephi_mcl.df,
           path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_info.csv')
 ```
 
@@ -368,6 +382,7 @@ sum(blast_filt_dup)
 
 blast_filt_dedup.df <- blast_filt.df[!blast_filt_dup,]
 
+#Test that best match is returned.
 pattern_filter <- 'NonamEVm000789t1_Cheng19_ERX2560129-ERR2541711_vvx|PVP01_0600400'
 pattern_filter <- 'PcyM_1354500|PocGH01_00134500'
 pattern_filter <- 'PVP01_0003840|PVW1_140089200'
