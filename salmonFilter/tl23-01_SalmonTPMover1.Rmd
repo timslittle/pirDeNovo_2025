@@ -34,6 +34,7 @@ library('kableExtra')
 # library('plotly')
 library('rmarkdown')
 library('seqinr')
+library('ggplot2')
 
 safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
                              "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888")
@@ -303,14 +304,23 @@ subfam.df <- data.frame(Name = deNovo_Ref_pirs.list,
                           str_extract(subfam, pattern = '^[[:lower:]]+'))
   )
 
-subfam.df$subfam[grepl(subfam.df$Name, pattern = 'PVX')] <- sapply(str_subset(subfam.df$Name, pattern = 'PVX'), 
-                                                                    function(sal1_id) {
-                                                                      if(sal1_id %in% lopez13_sal1Subfam$name) {
-                                                                        lopez13_sal1Subfam$subfam[which(lopez13_sal1Subfam$name %in% sal1_id)]
-                                                                      } else {
-                                                                        'vvxSal1'
-                                                                      }
-                                                                    })
+subfam.df$subfam[grepl(subfam.df$Name, pattern = 'PVX')] <- sapply(
+  str_subset(subfam.df$Name, pattern = 'PVX'), 
+  function(sal1_id) {
+    if(sal1_id %in% lopez13_sal1Subfam$name) {
+      lopez13_sal1Subfam$subfam[which(lopez13_sal1Subfam$name %in% sal1_id)]
+    } else {
+      'vvxSal1'
+    }
+  })
+
+#Which Lopez sequences are missing from the PlasmoDB search?
+
+write.table(lopez13_sal1Subfam[!lopez13_sal1Subfam$name %in% subfam.df$Name,]$name,
+            file = '../../network/lopez13_sal1Subfam_missingPirs.txt',
+            row.names = FALSE,
+            col.name = FALSE,
+            quote = FALSE)
 
 # Test subfam assignment
 # left_join(lopez13_sal1Subfam, mutate(subfam.df, name = Name), by = 'name')
@@ -361,6 +371,24 @@ write_csv(gephi_mcl.df,
           path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_info.csv')
 ```
 
+```{r best_network}
+
+filter(gephi_mcl.df, 
+       str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$')) %>%
+  select(Id, label, subfam, starts_with('I')) %>% 
+  data.table::melt(measure.vars = str_subset(colnames(gephi_mcl.df), 
+                                             pattern = '^I[[:digit:]]'),
+                   variable.name = 'inflation',
+                   value.name = 'cluster_num') %>% 
+  group_by(inflation, cluster_num, subfam) %>% 
+  summarise(num_members = n_distinct(label)) %>% 
+  summarise(num_members_clust = paste(subfam, paste0(' ', num_members), collapse = ', ')) %>% 
+  summarise(cluster_member_summary = paste(paste0(cluster_num, ': ', num_members_clust), collapse = ' | ')) %>% 
+  arrange(inflation)
+
+```
+
+
 ```{r node}
 
 blast.df <- read.table('../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_all2all.blast',
@@ -409,6 +437,36 @@ write_csv(edges.df,
           '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_edges.csv')
 
 ```
+
+```{r assembly_stats}
+assembly_numTranscript <- quant_filtered_sequence.df %>% 
+  group_by(assembly,fasta_path) %>% 
+  summarise(num_pir = n_distinct(Name)) %>% 
+  arrange(desc(num_pir)) %>% 
+  mutate(num_transcripts = system(paste0('grep ">" ',fasta_path,'| wc -l'), intern = TRUE),
+         expt = str_extract(assembly, pattern = '^.+(?=_.+_vvx)'))
+
+assembly_busco <- lapply(unique(quant_filtered_sequence.df$hmmer_path), 
+       function(hmmer.path){
+         res.path = str_extract(hmmer.path, pattern = '.+vvx_.+(?=/hmmer)')
+         assembly.nam = unique(quant_filtered_sequence.df$assembly[quant_filtered_sequence.df$hmmer_path == hmmer.path])
+         busco.df = read.table(paste0(res.path,
+                                      '/busco/',
+                                      assembly.nam,
+                                      '-plasmodium_odb10-busco.batch_summary.txt'),
+                               header = TRUE) %>% 
+           mutate(assembly = assembly.nam)
+       }) %>% bind_rows %>% arrange(Complete)
+
+assembly_stats.df <- full_join(assembly_numTranscript, assembly_busco, by = 'assembly') %>% arrange(desc(num_pir))
+
+ggplot(data = assembly_stats.df, aes(x = Complete, 
+                                     y = num_pir, 
+                                     col = expt)) +
+  geom_point(size = 4) +
+  theme_classic()
+```
+
 
 ```{r assembly_info}
 
