@@ -386,6 +386,16 @@ filter(gephi_mcl.df,
   summarise(cluster_member_summary = paste(paste0(cluster_num, ': ', num_members_clust), collapse = ' )( ')) %>% 
   arrange(inflation)
 
+gephi_mcl.df %>% 
+  select(-c(starts_with('I')), I1.4) %>% 
+  group_by(subfam, species, I1.4) %>% 
+  dplyr::summarise(number = n_distinct(label)) %>% 
+  group_by(I1.4) %>% 
+  mutate(perc_I = round(100*number/sum(number), digits = 2)) %>% 
+  group_by(subfam,species) %>% 
+  mutate(perc_spec = round(100*number/sum(number), digits = 2)) %>% 
+  arrange(I1.4, desc(perc_I))
+
 ```
 
 
