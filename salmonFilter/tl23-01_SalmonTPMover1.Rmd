@@ -282,7 +282,7 @@ Make the node.df file for graph design. Using the concatenated fasta file of the
 lopez13_sal1Subfam <- read.table('../../../tl22-02_VirSubfamNetwork/pir_info/lopez13_vir_subfam.txt', 
                                  col.names = c('name','subfam'),
                                  stringsAsFactors = FALSE)
-deNovo_Ref_pirs.list <- getName(read.fasta(file = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho.fasta'))
+deNovo_Ref_pirs.list <- getName(read.fasta(file = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13.fasta'))
 subfam.df <- data.frame(Name = deNovo_Ref_pirs.list,
                         subfam = case_when(grepl(deNovo_Ref_pirs.list, pattern = 'Nonam') ~ "de_novo",
                                            grepl(deNovo_Ref_pirs.list, pattern = 'PVX') ~ "vvxSal1",
@@ -316,17 +316,17 @@ subfam.df$subfam[grepl(subfam.df$Name, pattern = 'PVX')] <- sapply(
 
 #Which Lopez sequences are missing from the PlasmoDB search?
 
-write.table(lopez13_sal1Subfam[!lopez13_sal1Subfam$name %in% subfam.df$Name,]$name,
-            file = '../../network/lopez13_sal1Subfam_missingPirs.txt',
-            row.names = FALSE,
-            col.name = FALSE,
-            quote = FALSE)
+# write.table(lopez13_sal1Subfam[!lopez13_sal1Subfam$name %in% subfam.df$Name,]$name,
+#             file = '../../network/lopez13_sal1Subfam_missingPirs.txt',
+#             row.names = FALSE,
+#             col.name = FALSE,
+#             quote = FALSE)
 
 # Test subfam assignment
 # left_join(lopez13_sal1Subfam, mutate(subfam.df, name = Name), by = 'name')
 
 write_csv(subfam.df,
-          path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_Sal1subfam.csv')
+          path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_Sal1subfam.csv')
 ```
 
 Preparing the data for Gephi input requires some special treatment, including making a number for each node.
@@ -356,8 +356,8 @@ gephi.df <- mutate(subfam.df,
 ```
 
 ```{r mcl}
-mcl.files <- list.files(path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_mcl',
-           pattern = 'deNovoPirs-23Apr_pirsVvxVvxOrtho_all2all.mci.I.+list',
+mcl.files <- list.files(path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_mcl',
+           pattern = 'deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_all2all.mci.I.+list',
            full.names = TRUE)
 #Read in the mcl files and combine them by the name using Reduce to apply full_join across the list.
 mcl.df <- lapply(mcl.files, function(mcl_file){
@@ -368,7 +368,7 @@ mcl.df <- lapply(mcl.files, function(mcl_file){
 gephi_mcl.df <- full_join(gephi.df, mcl.df, by = 'label')
 
 write_csv(gephi_mcl.df,
-          path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_info.csv')
+          path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_info.csv')
 ```
 
 ```{r best_network}
@@ -383,7 +383,7 @@ filter(gephi_mcl.df,
   group_by(inflation, cluster_num, subfam) %>% 
   summarise(num_members = n_distinct(label)) %>% 
   summarise(num_members_clust = paste(subfam, paste0(' ', num_members), collapse = ', ')) %>% 
-  summarise(cluster_member_summary = paste(paste0(cluster_num, ': ', num_members_clust), collapse = ' | ')) %>% 
+  summarise(cluster_member_summary = paste(paste0(cluster_num, ': ', num_members_clust), collapse = ' )( ')) %>% 
   arrange(inflation)
 
 ```
@@ -391,7 +391,7 @@ filter(gephi_mcl.df,
 
 ```{r node}
 
-blast.df <- read.table('../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_all2all.blast',
+blast.df <- read.table('../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_all2all.blast',
                       col.names = unlist(strsplit(c('qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs qcovhsp slen nident'), split = ' ')))
 
 # Duplicate removal removes many more than expected due to multiple different alignments from the same sequences.
@@ -401,6 +401,7 @@ blast.df <- read.table('../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_all2all.b
 
 #Remove self-matches.
 blast_filt.df <- blast.df[apply(blast.df[,1:2], 1, function(x) if(x[1] == x[2]) FALSE else TRUE),]
+# could just do function(x) x[1] != x[2] ?
 
 #Arrange by e-value so the best matches come to the top.
 blast_filt.df <- arrange(blast_filt.df, evalue)
@@ -434,7 +435,7 @@ edges.df <- mutate(blast_filt_dedup.df,
   select(Source, Target, Type)
 
 write_csv(edges.df, 
-          '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_edges.csv')
+          '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_edges.csv')
 
 ```
 
