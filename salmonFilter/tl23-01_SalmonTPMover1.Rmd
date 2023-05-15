@@ -675,14 +675,14 @@ biplot(princomp(assigned_subfam_prop.mat))
 
 assigned_subfam_num.df <- assigned_subfam.df %>% 
   filter(assembly %in% assemblies_overFiftyBUSCO) %>% 
-  group_by(expt, experiment_id, I1.4, new_subfam_uniq) %>% 
+  group_by(expt, assembly, I1.4, new_subfam_uniq) %>% 
   summarise(num_genes = n_distinct(label))
 
-ggplot(assigned_subfam_num.df, aes(x = experiment_id, y = num_genes, fill = new_subfam_uniq)) +
+ggplot(assigned_subfam_num.df, aes(x = assembly, y = num_genes, fill = new_subfam_uniq)) +
          geom_col(position = 'fill')
 
 assigned_subfam_prop.df <- group_by(assigned_subfam_num.df, 
-                                    experiment_id) %>% 
+                                    assembly) %>% 
   arrange(I1.4) %>% 
   mutate(prop_genes = num_genes/sum(num_genes))
 
@@ -691,7 +691,7 @@ assigned_subfam_prop.df$new_subfam_uniq = factor(assigned_subfam_prop.df$new_sub
                                                  levels = unique(assigned_subfam_prop.df$new_subfam_uniq))
 
 assigned_subfam_prop.mat <- reshape2::dcast(assigned_subfam_prop.df, 
-                                            new_subfam_uniq ~ experiment_id, 
+                                            new_subfam_uniq ~ assembly, 
                                             value.var = 'prop_genes')
 rownames(assigned_subfam_prop.mat) <- assigned_subfam_prop.mat$new_subfam_uniq
 assigned_subfam_prop.mat$new_subfam_uniq <- NULL
@@ -703,8 +703,13 @@ Heatmap(assigned_subfam_prop.mat,
         # cluster_rows = FALSE,
         # cluster_columns = FALSE,
         row_names_gp = gpar(fontsize = 6),
-        col = circlize::colorRamp2(c(0,0.0001,0.5,1),
-                                   c('white',viridis::viridis(3))))
+        column_names_gp = gpar(fontsize = 6),
+        row_split = 4,
+        column_split = 6,
+        col = circlize::colorRamp2(c(0,0.0001,max(assigned_subfam_prop.mat)),
+                                   c('white',viridis::viridis(2))))
+
+# How does this correspond with the BUSCO scores?
 
 biplot(princomp(t(assigned_subfam_prop.mat)))
 
