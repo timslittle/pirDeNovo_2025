@@ -634,6 +634,11 @@ TODO: Split vivax into the three ref genomes.
 ```{r subfam_dis_spec}
 
 assigned_subfam_num.df <- assigned_subfam.df %>% 
+  mutate(species = ifelse(species == 'vvx' & !str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$') ,
+                          subfam,
+                          ifelse(species == 'vvx' & str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$'),
+                                 'vvxSal1',
+                                 species))) %>% 
   group_by(species, I1.4, new_subfam_uniq) %>% 
   summarise(num_genes = n_distinct(label))
 
@@ -657,16 +662,16 @@ assigned_subfam_prop.mat$new_subfam_uniq <- NULL
 
 library('ComplexHeatmap')
 
+assigned_subfam_prop.mat[is.na(assigned_subfam_prop.mat)] <- 0
 # max_col <- max(na.omit(assigned_subfam_prop.mat))
 Heatmap(assigned_subfam_prop.mat[1:26,], 
         na_col = 'white',
-        cluster_rows = FALSE,
-        cluster_columns = FALSE,
+        # cluster_rows = FALSE,
+        # cluster_columns = FALSE,
         row_names_gp = gpar(fontsize = 6),
-        col = circlize::colorRamp2(c(0,0.1,0.3,1),
-                                   viridis::inferno(4)))
+        col = circlize::colorRamp2(c(0,0.00001,0.1,1),
+                                   c('white', viridis::inferno(3))))
 
-assigned_subfam_prop.mat[is.na(assigned_subfam_prop.mat)] <- 0
 biplot(princomp(assigned_subfam_prop.mat))
 
 ```
