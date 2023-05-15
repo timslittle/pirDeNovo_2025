@@ -332,6 +332,18 @@ write_csv(subfam.df,
 Preparing the data for Gephi input requires some special treatment, including making a number for each node.
 
 ```{r gephi}
+# Get the info for all the sequences for later.
+quant_sequence.df <- mutate(quant.df, 
+                                      Name_assembly = paste0(Name, '_', assembly)) %>% 
+  # Grouping over all variables except those that are sample specific (as opposed to assembly specific)
+  group_by(pick(!matches(c('source|sample|file_source|TPM|NumReads|EffectiveLength')))) %>% 
+  summarise(TPM_med = median(TPM),
+            TPM_max = max(TPM),
+            TPM_min = min(TPM),
+            NumReads_med = median(NumReads),
+            NumReads_max = max(NumReads),
+            NumReads_min = min(NumReads))
+
 # Get the median TPM and NumReads for each assembly de novo pir
 quant_filtered_sequence.df <-  mutate(quant_filtered.df, 
                                       Name_assembly = paste0(Name, '_', assembly)) %>% 
@@ -395,6 +407,85 @@ gephi_mcl.df %>%
   group_by(subfam,species) %>% 
   mutate(perc_spec = round(100*number/sum(number), digits = 2)) %>% 
   arrange(I1.4, desc(perc_I))
+```
+
+```{r subfam_graph}
+subfam_col <- safe_colorblind_palette
+names(subfam_col) <- c('E','G','K','J','I','B','C')
+
+lapply( str_subset(colnames(gephi_mcl.df), pattern = '^I[[:digit:]]'),
+        function(infl){
+          subfam_graph.df <- gephi_mcl.df %>% 
+            select(-c(starts_with('I')), infl) %>% 
+            arrange(across(infl)) %>% 
+            group_by(across(infl)) %>% 
+            mutate(infl_net = factor(
+                # do.call(
+                paste0(get(infl), ' (n = ', n_distinct(label), ')')
+                # , list(infl = infl, label = label)
+              # )
+            )) %>% 
+          filter(str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$')) %>%
+            # mutate(subfam = ifelse(str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$'),
+            #                      subfam, 
+            #                      'none')) %>% 
+            group_by(subfam, species, infl_net) %>% 
+            dplyr::summarise(number = n_distinct(label))
+          
+          max_y <- max(summarise(group_by(subfam_graph.df, infl_net), sum_num = sum(number))$sum_num)
+          breaks_y <- seq(0, plyr::round_any(max_y, 5, ceiling), 5)
+          
+          (subfam_graph.plot <- ggplot(subfam_graph.df, aes(x = infl_net, y = number, fill = subfam)) +
+              geom_col(postion = 'stack') +
+              xlab('Cluster ID (total number of pirs in cluster)') +
+              ylab('Number of Sal1 pirs') +
+              scale_fill_manual(values = subfam_col, 
+                                name = 'Sal1 sub-family') +
+              scale_y_continuous(breaks = breaks_y, 
+                                 # limits = c(0, max(breaks_y))
+              ) +
+              theme_classic()+
+              theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) )
+        })
+```
+
+```{r save_I14}
+infl <- 'I1.4'
+
+subfam_graph.df <- gephi_mcl.df %>% 
+  select(-c(starts_with('I')), infl) %>% 
+  arrange(across(infl)) %>% 
+  group_by(across(infl)) %>% 
+  mutate(infl_net = factor(
+    # do.call(
+    paste0(get(infl), ' (n = ', n_distinct(label), ')')
+    # , list(infl = infl, label = label)
+    # )
+  )) %>% 
+  filter(str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$')) %>%
+  # mutate(subfam = ifelse(str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$'),
+  #                      subfam, 
+  #                      'none')) %>% 
+  group_by(subfam, species, infl_net) %>% 
+  dplyr::summarise(number = n_distinct(label))
+
+max_y <- max(summarise(group_by(subfam_graph.df, infl_net), sum_num = sum(number))$sum_num)
+breaks_y <- seq(0, plyr::round_any(max_y, 5, ceiling), 5)
+
+(subfam_graph.plot <- ggplot(subfam_graph.df, aes(x = infl_net, y = number, fill = subfam)) +
+    geom_col(postion = 'stack') +
+    xlab('Cluster ID (total number of pirs in cluster)') +
+    ylab('Number of Sal1 pirs') +
+    scale_fill_manual(values = subfam_col, 
+                      name = 'Sal1 sub-family') +
+    scale_y_continuous(breaks = breaks_y, 
+                       # limits = c(0, max(breaks_y))
+    ) +
+    theme_classic()+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) )
+
+ggsave('../../plots/vivax_subfamDisI14Network.pdf', 
+       subfam_graph.plot)
 
 ```
 
@@ -450,34 +541,59 @@ write_csv(edges.df,
 ```
 
 ```{r assembly_stats}
-assembly_numTranscript <- quant_filtered_sequence.df %>% 
-  group_by(assembly,fasta_path) %>% 
-  summarise(num_pir = n_distinct(Name)) %>% 
-  arrange(desc(num_pir)) %>% 
-  mutate(num_transcripts = system(paste0('grep ">" ',fasta_path,'| wc -l'), intern = TRUE),
-         expt = str_extract(assembly, pattern = '^.+(?=_.+_vvx)'))
+# assembly_numTranscript <- quant_sequence.df %>% 
+#   group_by(assembly,fasta_path) %>% 
+#   # Use the same metrics as before to count the number of pirs, using *_max now.
+#   summarise(num_pir = n_distinct(Name[TPM_max >= 1 & NumReads_max >= 1 & !is.na(hmm_cvrg) & hmm_cvrg_perc >= 75])) %>% 
+#   arrange(desc(num_pir), assembly) %>% 
+#   mutate(num_transcripts = system(paste0('grep ">" ',fasta_path,'| wc -l'), intern = TRUE),
+#          expt = str_extract(assembly, pattern = '^.+(?=_.+_vvx)'))
+# 
+# assembly_busco <- lapply(unique(quant_sequence.df$hmmer_path), 
+#        function(hmmer.path){
+#          res.path = str_extract(hmmer.path, pattern = '.+vvx_.+(?=/hmmer)')
+#          assembly.nam = unique(quant_sequence.df$assembly[quant_sequence.df$hmmer_path == hmmer.path])
+#          busco.df = read.table(paste0(res.path,
+#                                       '/busco/',
+#                                       assembly.nam,
+#                                       '-plasmodium_odb10-busco.batch_summary.txt'),
+#                                header = TRUE) %>% 
+#            mutate(assembly = assembly.nam)
+#        }) %>% bind_rows %>% arrange(Complete)
+# 
+# assembly_stats.df <- full_join(assembly_numTranscript, assembly_busco, by = 'assembly') %>% arrange(desc(num_pir))
+# 
+# write_csv(arrange(assembly_stats.df, expt), 
+#           path = 'assembly_stats.csv')
 
-assembly_busco <- lapply(unique(quant_filtered_sequence.df$hmmer_path), 
-       function(hmmer.path){
-         res.path = str_extract(hmmer.path, pattern = '.+vvx_.+(?=/hmmer)')
-         assembly.nam = unique(quant_filtered_sequence.df$assembly[quant_filtered_sequence.df$hmmer_path == hmmer.path])
-         busco.df = read.table(paste0(res.path,
-                                      '/busco/',
-                                      assembly.nam,
-                                      '-plasmodium_odb10-busco.batch_summary.txt'),
-                               header = TRUE) %>% 
-           mutate(assembly = assembly.nam)
-       }) %>% bind_rows %>% arrange(Complete)
+assembly_stats.df <- read_csv('assembly_stats_lifecycle.csv')
 
-assembly_stats.df <- full_join(assembly_numTranscript, assembly_busco, by = 'assembly') %>% arrange(desc(num_pir))
+# Manually altered the assembly_stats csv file to include life cycle stages and experimental identifiers.
 
-ggplot(data = assembly_stats.df, aes(x = Complete, 
-                                     y = num_pir, 
-                                     col = expt)) +
-  geom_point(size = 4) +
-  theme_classic()
+lapply(c('mosquito','asexual'), function(stages){
+  ggplot(data = filter(assembly_stats.df, str_detect(lifecycle_stage, 
+                                                     pattern = stages)) , 
+         aes(x = Complete, 
+             y = num_pir, 
+             col = experiment_id,
+             shape = lifecycle_stage)) +
+    geom_point(size = 4) +
+    scale_shape_manual(values = seq(1,10)) +
+    xlab('Percentage of complete BUSCOs') +
+    ylab('Number of pirs') +
+    theme_classic() +
+    guides(color = guide_legend(ncol = 2),
+           size = guide_legend(ncol = 2),
+           shape = guide_legend(ncol = 2)) +
+    theme(legend.text = element_text(size = 7),
+          legend.key.size = unit(.5,"cm"))
+})
+
 ```
 
+```{r}
+
+```
 
 ```{r assembly_info}
 
