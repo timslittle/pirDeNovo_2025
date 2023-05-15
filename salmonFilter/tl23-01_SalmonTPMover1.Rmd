@@ -613,6 +613,44 @@ assigned_subfam.df <- inner_join(assigned_subfam.df,
 
 ```
 
+```{r subfam_dis_spec}
+
+assigned_subfam_num.df <- assigned_subfam.df %>% 
+  group_by(species, I1.4, new_subfam_uniq) %>% 
+  summarise(num_genes = n_distinct(label))
+
+ggplot(assigned_subfam_num.df, aes(x = species, y = num_genes, fill = new_subfam_uniq)) +
+         geom_col(position = 'fill')
+
+assigned_subfam_prop.df <- group_by(assigned_subfam_num.df, 
+                                    species) %>% 
+  arrange(I1.4) %>% 
+  mutate(prop_genes = num_genes/sum(num_genes))
+
+# To order the sub-families from largest to smallest in the heatmap.
+assigned_subfam_prop.df$new_subfam_uniq = factor(assigned_subfam_prop.df$new_subfam_uniq, 
+                                                 levels = unique(assigned_subfam_prop.df$new_subfam_uniq))
+
+assigned_subfam_prop.mat <- reshape2::dcast(assigned_subfam_prop.df, 
+                                            new_subfam_uniq ~ species, 
+                                            value.var = 'prop_genes')
+rownames(assigned_subfam_prop.mat) <- assigned_subfam_prop.mat$new_subfam_uniq
+assigned_subfam_prop.mat$new_subfam_uniq <- NULL
+
+library('ComplexHeatmap')
+
+# max_col <- max(na.omit(assigned_subfam_prop.mat))
+Heatmap(assigned_subfam_prop.mat, 
+        na_col = 'white',
+        cluster_rows = FALSE,
+        cluster_columns = FALSE,
+        row_names_gp = gpar(fontsize = 5),
+        col = circlize::colorRamp2(c(0,0.1,0.3,1),
+                                   viridis::inferno(4)))
+
+```
+
+
 ```{r assembly_info}
 
 assembly_info.df <- read.delim('/camp/lab/langhornej/working/HPC/littlet/tl22-01_vivaxDeNovo/tl22-01_assembly_info.txt') %>% 
