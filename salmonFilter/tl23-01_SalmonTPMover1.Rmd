@@ -491,7 +491,6 @@ ggsave('../../plots/vivax_subfamDisI14Network.pdf',
 
 
 ```{r node}
-
 blast.df <- read.table('../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_all2all.blast',
                       col.names = unlist(strsplit(c('qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs qcovhsp slen nident'), split = ' ')))
 
@@ -591,7 +590,15 @@ lapply(c('mosquito','asexual'), function(stages){
 
 ```
 
-```{r}
+Define subfam for each cluster based on the most frequent sub-family in each cluster, but only if there's at least five members in the cluster.
+
+```{r assign_subfam_to_clusters}
+assigned_subfam.df <- gephi_mcl.df %>% 
+  select(-c(starts_with('I')), I1.4) %>% 
+  group_by(I1.4) %>% 
+  mutate(new_subfam = ifelse(sum(str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$')) > 5,
+                             names(which.max(table(factor(str_subset(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$'))))),
+                             'new'))
 
 ```
 
