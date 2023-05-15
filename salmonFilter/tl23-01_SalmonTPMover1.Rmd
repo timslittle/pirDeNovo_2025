@@ -599,6 +599,17 @@ assigned_subfam.df <- gephi_mcl.df %>%
   mutate(new_subfam = ifelse(sum(str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$')) > 5,
                              names(which.max(table(factor(str_subset(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$'))))),
                              'new'))
+#which.max code finds the most frequent members, table does the enumerating.
+
+#Get unique names for each sub-family.
+assigned_subfam_uniqName.df <- group_by(assigned_subfam.df, I1.4) %>% 
+  slice_max(label)
+assigned_subfam_uniqName.df$new_subfam_uniq <- uniquify(assigned_subfam_uniqName.df$new_subfam, 
+                                                        first_one = TRUE)
+
+assigned_subfam.df <- inner_join(assigned_subfam.df, 
+                                 assigned_subfam_uniqName.df[,28:30],
+                                 by = c('I1.4', 'new_subfam'))
 
 ```
 
