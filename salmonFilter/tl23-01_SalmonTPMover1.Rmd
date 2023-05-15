@@ -227,11 +227,11 @@ quant.df <- read.csv(file = 'salmonQuant_all.csv')
 ```{r quant_filtered}
 # Grouping by each assembly and transcript, which transcripts have TPM and NumReads < 1 TPM in every sample.
 #. i.e. Filter out every transcript with at least one sample with >= 1 TPM/NumReads.
-# quant_filtered.df <- group_by(quant.df, 
+# quant_filtered.df <- group_by(quant.df,
 #                               assembly,
 #                               fasta_path,
-#                               Name) %>% 
-#   filter(any(TPM >= 1 & NumReads >= 1)) %>% 
+#                               Name) %>%
+#   filter(any(TPM >= 1 & NumReads >= 1)) %>%
 #   filter(!is.na(hmm_cvrg) & hmm_cvrg_perc >= 75)
 # write_csv(quant_filtered.df, path = 'salmonQuant_filtered.csv')
 quant_filtered.df <- read.csv('salmonQuant_filtered.csv')
@@ -365,6 +365,9 @@ gephi.df <- mutate(subfam.df,
   left_join(quant_filtered_sequence.df, by = c('Name_assembly')) %>% 
   relocate(Id, label)
 
+#Prev issue: Why are a load of Meul22_Pv032 pirs in subfam.df but not quant_filtered_sequence.df.
+## quant_filtered.df was out-of-date, may have not saved a previous iteration?
+
 ```
 
 ```{r mcl}
@@ -379,12 +382,13 @@ mcl.df <- lapply(mcl.files, function(mcl_file){
 
 gephi_mcl.df <- full_join(gephi.df, mcl.df, by = 'label')
 
+# any(is.na(gephi_mcl.df$Name_assembly))
+
 write_csv(gephi_mcl.df,
           path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_info.csv')
 ```
 
 ```{r best_network}
-
 filter(gephi_mcl.df, 
        str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$')) %>%
   select(Id, label, subfam, starts_with('I')) %>% 
@@ -588,7 +592,15 @@ lapply(c('mosquito','asexual'), function(stages){
           legend.key.size = unit(.5,"cm"))
 })
 
+assembly_stats.df[assembly_stats.df$Complete > 50,] %>% arrange(num_pir)
+assemblies_overFiftyBUSCO <- assembly_stats.df$assembly[assembly_stats.df$Complete > 50]
+assembly_stats.df[assembly_stats.df$Complete <= 50,] %>% arrange(num_pir)
+
 ```
+
+Doens't plateau, as expected this is probably an underestimate of the total pir transcriptome.
+
+Annoyingly 50% Complete BUSCO excludes Meul22_PNG056 (373 pirs) and all other PNG pir samples.
 
 Define subfam for each cluster based on the most frequent sub-family in each cluster, but only if there's at least five members in the cluster.
 
@@ -598,20 +610,26 @@ assigned_subfam.df <- gephi_mcl.df %>%
   group_by(I1.4) %>% 
   mutate(new_subfam = ifelse(sum(str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$')) > 5,
                              names(which.max(table(factor(str_subset(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$'))))),
-                             'new'))
+                             'new')) %>% 
+  #Combine with the assembly_stats
+  left_join(assembly_stats.df)
 #which.max code finds the most frequent members, table does the enumerating.
 
 #Get unique names for each sub-family.
 assigned_subfam_uniqName.df <- group_by(assigned_subfam.df, I1.4) %>% 
-  slice_max(label)
+  slice_max(label) %>% 
+  select(I1.4,new_subfam)
 assigned_subfam_uniqName.df$new_subfam_uniq <- uniquify(assigned_subfam_uniqName.df$new_subfam, 
                                                         first_one = TRUE)
 
 assigned_subfam.df <- inner_join(assigned_subfam.df, 
-                                 assigned_subfam_uniqName.df[,28:30],
-                                 by = c('I1.4', 'new_subfam'))
+                                 assigned_subfam_uniqName.df,
+                                 by = c('I1.4', 'new_subfam')) %>% 
+  mutate(expt = str_extract(assembly, pattern = '^.+(?=_.+_vvx)'))
 
 ```
+
+TODO: Split vivax into the three ref genomes.
 
 ```{r subfam_dis_spec}
 
@@ -640,16 +658,57 @@ assigned_subfam_prop.mat$new_subfam_uniq <- NULL
 library('ComplexHeatmap')
 
 # max_col <- max(na.omit(assigned_subfam_prop.mat))
-Heatmap(assigned_subfam_prop.mat, 
+Heatmap(assigned_subfam_prop.mat[1:26,], 
         na_col = 'white',
         cluster_rows = FALSE,
         cluster_columns = FALSE,
-        row_names_gp = gpar(fontsize = 5),
+        row_names_gp = gpar(fontsize = 6),
         col = circlize::colorRamp2(c(0,0.1,0.3,1),
                                    viridis::inferno(4)))
 
+assigned_subfam_prop.mat[is.na(assigned_subfam_prop.mat)] <- 0
+biplot(princomp(assigned_subfam_prop.mat))
+
 ```
 
+```{r subfam_dis_expt}
+
+assigned_subfam_num.df <- assigned_subfam.df %>% 
+  filter(assembly %in% assemblies_overFiftyBUSCO) %>% 
+  group_by(expt, experiment_id, I1.4, new_subfam_uniq) %>% 
+  summarise(num_genes = n_distinct(label))
+
+ggplot(assigned_subfam_num.df, aes(x = experiment_id, y = num_genes, fill = new_subfam_uniq)) +
+         geom_col(position = 'fill')
+
+assigned_subfam_prop.df <- group_by(assigned_subfam_num.df, 
+                                    experiment_id) %>% 
+  arrange(I1.4) %>% 
+  mutate(prop_genes = num_genes/sum(num_genes))
+
+# To order the sub-families from largest to smallest in the heatmap.
+assigned_subfam_prop.df$new_subfam_uniq = factor(assigned_subfam_prop.df$new_subfam_uniq, 
+                                                 levels = unique(assigned_subfam_prop.df$new_subfam_uniq))
+
+assigned_subfam_prop.mat <- reshape2::dcast(assigned_subfam_prop.df, 
+                                            new_subfam_uniq ~ experiment_id, 
+                                            value.var = 'prop_genes')
+rownames(assigned_subfam_prop.mat) <- assigned_subfam_prop.mat$new_subfam_uniq
+assigned_subfam_prop.mat$new_subfam_uniq <- NULL
+
+assigned_subfam_prop.mat[is.na(assigned_subfam_prop.mat)] <- 0
+# max_col <- max(na.omit(assigned_subfam_prop.mat))
+Heatmap(assigned_subfam_prop.mat, 
+        na_col = 'white',
+        # cluster_rows = FALSE,
+        # cluster_columns = FALSE,
+        row_names_gp = gpar(fontsize = 6),
+        col = circlize::colorRamp2(c(0,0.0001,0.5,1),
+                                   c('white',viridis::viridis(3))))
+
+biplot(princomp(t(assigned_subfam_prop.mat)))
+
+```
 
 ```{r assembly_info}
 
