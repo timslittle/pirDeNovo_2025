@@ -718,7 +718,7 @@ subfam_ht <- Heatmap(t(assigned_subfam_prop.mat)[sort(colnames(assigned_subfam_p
         # cluster_columns = FALSE,
         row_names_gp = gpar(fontsize = 6),
         column_names_gp = gpar(fontsize = 6),
-        # row_split = 6,
+        row_split = 2,
         column_split = 4,
         col = circlize::colorRamp2(c(0,0.0001,
                                      max(assigned_subfam_prop.mat)/4,
