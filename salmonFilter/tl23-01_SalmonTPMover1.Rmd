@@ -687,7 +687,7 @@ biplot(princomp(assigned_subfam_prop.mat))
 
 ```{r subfam_dis_expt}
 assigned_subfam_num.df <- assigned_subfam.df %>% 
-  filter(assembly %in% c(assemblies_overFiftyBUSCO, 'Meul22_PNG056_vvx')) %>% 
+  filter(Complete >= 50) %>% 
   group_by(expt, assembly_id, I1.4, new_subfam_uniq, Complete) %>% 
   summarise(num_genes = n_distinct(label))
 
@@ -711,13 +711,14 @@ assigned_subfam_prop.mat$new_subfam_uniq <- NULL
 
 assigned_subfam_prop.mat[is.na(assigned_subfam_prop.mat)] <- 0
 # max_col <- max(na.omit(assigned_subfam_prop.mat))
-subfam_ht <- Heatmap(t(assigned_subfam_prop.mat), 
+subfam_ht <- Heatmap(t(assigned_subfam_prop.mat)[sort(colnames(assigned_subfam_prop.mat)),], 
         na_col = 'white',
+        name = 'Prop subfam',
         # cluster_rows = FALSE,
         # cluster_columns = FALSE,
         row_names_gp = gpar(fontsize = 6),
         column_names_gp = gpar(fontsize = 6),
-        row_split = 6,
+        # row_split = 6,
         column_split = 4,
         col = circlize::colorRamp2(c(0,0.0001,
                                      max(assigned_subfam_prop.mat)/4,
@@ -733,10 +734,13 @@ busco.mat <- assigned_subfam_prop.df %>%
 names_busco.mat <- busco.mat[1,]
 busco.mat <- t(matrix(as.numeric(busco.mat[-1,])))
 duplicated_val <- !duplicated(names_busco.mat)
-busco.mat <- busco.mat[duplicated_val]
-names(busco.mat) <- names_busco.mat[duplicated_val]
+busco.mat <- matrix(busco.mat[duplicated_val])
+rownames(busco.mat) <- names_busco.mat[duplicated_val]
 
-busco_ht <- Heatmap(busco.mat,
+
+# busco.ha <- HeatmapAnnotation(busco = anno_simple(busco.mat))
+
+busco_ht <- Heatmap(busco.mat[sort(rownames(busco.mat)),],
                     name = 'busco',
         cluster_rows = FALSE,
         cluster_columns = FALSE,
