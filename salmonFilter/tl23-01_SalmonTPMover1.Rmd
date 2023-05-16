@@ -756,3 +756,21 @@ draw(subfam_ht + busco_ht)
 biplot(princomp(t(assigned_subfam_prop.mat)))
 
 ```
+
+```{r tpm}
+
+```
+
+```{r expression}
+colnames(assigned_subfam.df)[22:45] %>% dput
+quant_subfam.df <- left_join(quant.df, 
+           select(assigned_subfam.df, c('label', 'Name', 'hmmer_path', "TPM_med", "TPM_max", "TPM_min", "NumReads_med", "NumReads_max", 
+                                        "NumReads_min", "I1.4", "new_subfam", "num_pir", "num_transcripts", 
+                                        "expt", "Input_file", "Dataset", "Complete", "Single", "Duplicated", 
+                                        "Fragmented", "Missing", "n_markers", "lifecycle_stage", "location", 
+                                        "experiment_id", "new_subfam_uniq", "assembly_id")),
+           by = c('Name', 'hmmer_path'))
+
+quant_subfam.df
+```
+
