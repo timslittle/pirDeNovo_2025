@@ -495,51 +495,53 @@ ggsave('../../plots/vivax_subfamDisI14Network.pdf',
 
 
 ```{r node}
-blast.df <- read.table('../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_all2all.blast',
-                      col.names = unlist(strsplit(c('qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs qcovhsp slen nident'), split = ' ')))
+# Comment out when not needed as this takes a long time.
 
-# Duplicate removal removes many more than expected due to multiple different alignments from the same sequences.
-#   TODO: How should I deal with these? Would be ideal to combine but this would take a while. May take lazy way out and just take the best match.
-
-# Could make this faster by arranging by assembly and then saving the qseqid instances and removing the sseqid instances of each assembly going down the data frame.
-
-#Remove self-matches.
-blast_filt.df <- blast.df[apply(blast.df[,1:2], 1, function(x) if(x[1] == x[2]) FALSE else TRUE),]
-# could just do function(x) x[1] != x[2] ?
-
-#Arrange by e-value so the best matches come to the top.
-blast_filt.df <- arrange(blast_filt.df, evalue)
-
-blast_filt_dup <- apply(blast_filt.df[,1:2],1,sort) %>% t %>% duplicated
-sum(blast_filt_dup)
-
-blast_filt_dedup.df <- blast_filt.df[!blast_filt_dup,]
-
-#Test that best match is returned.
-pattern_filter <- 'NonamEVm000789t1_Cheng19_ERX2560129-ERR2541711_vvx|PVP01_0600400'
-pattern_filter <- 'PcyM_1354500|PocGH01_00134500'
-pattern_filter <- 'PVP01_0003840|PVW1_140089200'
-
-filter(blast_filt_dedup.df, 
-       grepl(qseqid, 
-             pattern = pattern_filter), 
-       grepl(sseqid, 
-             pattern = pattern_filter))
-
-filter(blast.df, 
-       grepl(qseqid, 
-                       pattern = pattern_filter), 
-       grepl(sseqid, 
-             pattern = pattern_filter))
-
-edges.df <- mutate(blast_filt_dedup.df, 
-       Source = gephi.df$Id[match(qseqid, gephi.df$label)],
-       Target = gephi.df$Id[match(sseqid, gephi.df$label)],
-       Type = 'undirected') %>% 
-  select(Source, Target, Type)
-
-write_csv(edges.df, 
-          '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_edges.csv')
+# blast.df <- read.table('../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_all2all.blast',
+#                       col.names = unlist(strsplit(c('qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs qcovhsp slen nident'), split = ' ')))
+# 
+# # Duplicate removal removes many more than expected due to multiple different alignments from the same sequences.
+# #   TODO: How should I deal with these? Would be ideal to combine but this would take a while. May take lazy way out and just take the best match.
+# 
+# # Could make this faster by arranging by assembly and then saving the qseqid instances and removing the sseqid instances of each assembly going down the data frame.
+# 
+# #Remove self-matches.
+# blast_filt.df <- blast.df[apply(blast.df[,1:2], 1, function(x) if(x[1] == x[2]) FALSE else TRUE),]
+# # could just do function(x) x[1] != x[2] ?
+# 
+# #Arrange by e-value so the best matches come to the top.
+# blast_filt.df <- arrange(blast_filt.df, evalue)
+# 
+# blast_filt_dup <- apply(blast_filt.df[,1:2],1,sort) %>% t %>% duplicated
+# sum(blast_filt_dup)
+# 
+# blast_filt_dedup.df <- blast_filt.df[!blast_filt_dup,]
+# 
+# #Test that best match is returned.
+# pattern_filter <- 'NonamEVm000789t1_Cheng19_ERX2560129-ERR2541711_vvx|PVP01_0600400'
+# pattern_filter <- 'PcyM_1354500|PocGH01_00134500'
+# pattern_filter <- 'PVP01_0003840|PVW1_140089200'
+# 
+# filter(blast_filt_dedup.df, 
+#        grepl(qseqid, 
+#              pattern = pattern_filter), 
+#        grepl(sseqid, 
+#              pattern = pattern_filter))
+# 
+# filter(blast.df, 
+#        grepl(qseqid, 
+#                        pattern = pattern_filter), 
+#        grepl(sseqid, 
+#              pattern = pattern_filter))
+# 
+# edges.df <- mutate(blast_filt_dedup.df, 
+#        Source = gephi.df$Id[match(qseqid, gephi.df$label)],
+#        Target = gephi.df$Id[match(sseqid, gephi.df$label)],
+#        Type = 'undirected') %>% 
+#   select(Source, Target, Type)
+# 
+# write_csv(edges.df, 
+#           '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_edges.csv')
 
 ```
 
@@ -625,7 +627,10 @@ assigned_subfam_uniqName.df$new_subfam_uniq <- uniquify(assigned_subfam_uniqName
 assigned_subfam.df <- inner_join(assigned_subfam.df, 
                                  assigned_subfam_uniqName.df,
                                  by = c('I1.4', 'new_subfam')) %>% 
-  mutate(expt = str_extract(assembly, pattern = '^.+(?=_.+_vvx)'))
+  mutate(expt = str_extract(assembly, pattern = '^.+(?=_.+_vvx)'),
+         assembly_id = paste0(experiment_id,'_',
+                              str_extract(assembly, 
+                                          pattern = '(?<=_).+(?=_)')))
 
 ```
 
@@ -664,30 +669,33 @@ library('ComplexHeatmap')
 
 assigned_subfam_prop.mat[is.na(assigned_subfam_prop.mat)] <- 0
 # max_col <- max(na.omit(assigned_subfam_prop.mat))
-Heatmap(assigned_subfam_prop.mat[1:26,], 
+Heatmap(t(assigned_subfam_prop.mat[1:26,]), 
         na_col = 'white',
         # cluster_rows = FALSE,
         # cluster_columns = FALSE,
+        row_split = 4,
+        # column_split = 3,
         row_names_gp = gpar(fontsize = 6),
-        col = circlize::colorRamp2(c(0,0.00001,0.1,1),
-                                   c('white', viridis::inferno(3))))
+        col = circlize::colorRamp2(c(0,0.0001,
+                                     max(assigned_subfam_prop.mat)/4,
+                                     max(assigned_subfam_prop.mat)),
+                                   c('white',viridis::viridis(3))))
 
 biplot(princomp(assigned_subfam_prop.mat))
 
 ```
 
 ```{r subfam_dis_expt}
-
 assigned_subfam_num.df <- assigned_subfam.df %>% 
-  filter(assembly %in% assemblies_overFiftyBUSCO) %>% 
-  group_by(expt, assembly, I1.4, new_subfam_uniq) %>% 
+  filter(assembly %in% c(assemblies_overFiftyBUSCO, 'Meul22_PNG056_vvx')) %>% 
+  group_by(expt, assembly_id, I1.4, new_subfam_uniq, Complete) %>% 
   summarise(num_genes = n_distinct(label))
 
-ggplot(assigned_subfam_num.df, aes(x = assembly, y = num_genes, fill = new_subfam_uniq)) +
+ggplot(assigned_subfam_num.df, aes(x = assembly_id, y = num_genes, fill = new_subfam_uniq)) +
          geom_col(position = 'fill')
 
 assigned_subfam_prop.df <- group_by(assigned_subfam_num.df, 
-                                    assembly) %>% 
+                                    assembly_id) %>% 
   arrange(I1.4) %>% 
   mutate(prop_genes = num_genes/sum(num_genes))
 
@@ -696,170 +704,51 @@ assigned_subfam_prop.df$new_subfam_uniq = factor(assigned_subfam_prop.df$new_sub
                                                  levels = unique(assigned_subfam_prop.df$new_subfam_uniq))
 
 assigned_subfam_prop.mat <- reshape2::dcast(assigned_subfam_prop.df, 
-                                            new_subfam_uniq ~ assembly, 
+                                            new_subfam_uniq ~ assembly_id, 
                                             value.var = 'prop_genes')
 rownames(assigned_subfam_prop.mat) <- assigned_subfam_prop.mat$new_subfam_uniq
 assigned_subfam_prop.mat$new_subfam_uniq <- NULL
 
 assigned_subfam_prop.mat[is.na(assigned_subfam_prop.mat)] <- 0
 # max_col <- max(na.omit(assigned_subfam_prop.mat))
-Heatmap(assigned_subfam_prop.mat, 
+subfam_ht <- Heatmap(t(assigned_subfam_prop.mat), 
         na_col = 'white',
         # cluster_rows = FALSE,
         # cluster_columns = FALSE,
         row_names_gp = gpar(fontsize = 6),
         column_names_gp = gpar(fontsize = 6),
-        row_split = 4,
-        column_split = 6,
-        col = circlize::colorRamp2(c(0,0.0001,max(assigned_subfam_prop.mat)),
-                                   c('white',viridis::viridis(2))))
+        row_split = 6,
+        column_split = 4,
+        col = circlize::colorRamp2(c(0,0.0001,
+                                     max(assigned_subfam_prop.mat)/4,
+                                     max(assigned_subfam_prop.mat)),
+                                   c('white',viridis::viridis(3))))
 
 # How does this correspond with the BUSCO scores?
+
+busco.mat <- assigned_subfam_prop.df %>% 
+  select(assembly_id, Complete) %>% 
+  mutate(Complete = as.numeric(Complete)) %>% 
+  t 
+names_busco.mat <- busco.mat[1,]
+busco.mat <- t(matrix(as.numeric(busco.mat[-1,])))
+duplicated_val <- !duplicated(names_busco.mat)
+busco.mat <- busco.mat[duplicated_val]
+names(busco.mat) <- names_busco.mat[duplicated_val]
+
+busco_ht <- Heatmap(busco.mat,
+                    name = 'busco',
+        cluster_rows = FALSE,
+        cluster_columns = FALSE,
+        row_names_gp = gpar(fontsize = 6),
+        column_names_gp = gpar(fontsize = 6),
+                    col = circlize::colorRamp2(c(min(busco.mat),
+                                     (max(busco.mat) + min(busco.mat))/2,
+                                     max(busco.mat)),
+                                   c(viridis::magma(3))))
+
+draw(subfam_ht + busco_ht)
 
 biplot(princomp(t(assigned_subfam_prop.mat)))
 
 ```
-
-```{r assembly_info}
-
-assembly_info.df <- read.delim('/camp/lab/langhornej/working/HPC/littlet/tl22-01_vivaxDeNovo/tl22-01_assembly_info.txt') %>% 
-  filter(!grepl(assembly, pattern = '0\\.9c|0\\.99'),
-         !grepl(assembly, pattern = 'SRX5158513_SRR8347514|SRX5158512_SRR8347515'))  
-#Filter out any none-0.95 assembly made. And potential Kim19_A duplicate?
-
-#Order experiments by years
-expt_num.vec <-ordering(unique(assembly_info.df$experiment), 
-                                   order_vector = c(16:22))
-#Get experiment numbers and add '0' to single digit numbers.
-names(expt_num.vec) <-  paste0('E', 
-                              sapply(seq_along(expt_num.vec), function(x){
-                                ifelse(nchar(x)==1, 
-                                       paste0('0', x),
-                                       x)
-                              }))
-
-#Manually add Gunalan19 and _Boonkaew20 (in addition to Guna19 and Boonkaew20)
-expt_num.vec <- c(expt_num.vec, E07 = 'Gunalan19', E08 = '_Boonkaew20')
-
-#Get the relevant info from samplesheet otherwise loads of rows will be duplicated when joining.
-samplesheet_small.df <- mutate(samplesheet, assembly_file = assembly) %>% 
-  select(assembly_file, Cat.Sample.stage.s.) %>% unique
-
-assembly_info_samplesheet.df <- left_join(assembly_info.df, samplesheet_small.df, by = 'assembly_file')
-
-assembly_info_samplesheet.df <- mutate(assembly_info_samplesheet.df,
-                                        experiment_num = names(expt_num.vec)[match(experiment,
-                                                                                  expt_num.vec)])
-
-#Get consistent shapes and colours for the graphs
-
-shapes_val <- 1:length(unique(assembly_info_samplesheet.df$Cat.Sample.stage.s.))
-names(shapes_val) <- unique(assembly_info_samplesheet.df$Cat.Sample.stage.s.)
-
-colours_val <- safe_colorblind_palette[1:length(unique(names(expt_num.vec)))]
-names(colours_val) <- unique(names(expt_num.vec))
-
-expt_num.df <- data.frame(expt = expt_num.vec, 
-                          expt_code = names(expt_num.vec), 
-                          col = c(colours_val,colours_val['E07'],colours_val['E08']))
-
-#Get the stages of the life cycle used for the assembly (altering the Gunalan sample name in over1.df since they do not correspond).
-over1.df$stage <- assembly_info_samplesheet.df$Cat.Sample.stage.s.[
-  match(str_replace(over1.df$assembly, pattern = 'Gunalan19', replacement = 'Guna19'), 
-        str_extract(assembly_info_samplesheet.df$assembly, 
-                    pattern = '.+(?=_scspades_0.95cdhitest)'))
-]
-
-#Get the experiment numbers (altering the Gunalan sample name in over1.df since they do not correspond).
-over1.df$experiment_num <- assembly_info_samplesheet.df$experiment_num[
-  match(str_replace(over1.df$assembly, pattern = 'Gunalan19', replacement = 'Guna19'), 
-        str_extract(assembly_info_samplesheet.df$assembly, 
-                    pattern = '.+(?=_scspades_0.95cdhitest)'))
-]
-
-#Save the colour scheme
-assembly_info_samplesheet.df$expt_colour <- colours_val[match(assembly_info_samplesheet.df$experiment_num,
-                                                  names(colours_val))]
-
-#Save number of pir transcripts over 1 TPM (altering the Gunalan sample name in over1.df since they do not correspond).
-pir_over1.df <- filter(over1.df, pir)  
-
-assembly_info_samplesheet.df$num_mRNA_pir_over200aa_over1TPM <- pir_over1.df$over1_num[
-  match(str_extract(assembly_info_samplesheet.df$assembly, 
-                    pattern = '.+(?=_scspades_0.95cdhitest)'),
-        str_replace(pir_over1.df$assembly, pattern = 'Gunalan19', replacement = 'Guna19'))
-]
-
-# Make NAs zero
-assembly_info_samplesheet.df$num_mRNA_pir_over200aa_over1TPM <- ifelse(
-  is.na(assembly_info_samplesheet.df$num_mRNA_pir_over200aa_over1TPM),
-  0,
-  assembly_info_samplesheet.df$num_mRNA_pir_over200aa_over1TPM 
-)
-
-write.table(assembly_info_samplesheet.df,
-            '/camp/lab/langhornej/working/HPC/littlet/tl22-01_vivaxDeNovo/tl22-01_assembly_info_extra.txt')
-
-```
-
-```{r over1_plots}
-
-(plot <- ggplot(data = filter(over1.df, !pir),
-                aes(x = total, 
-                    y = over1_perc,
-                    col = experiment_num,
-                    shape = stage)) +
-    geom_point(size = 1, stroke = 2, alpha = .75) +
-  scale_shape_manual(values=shapes_val,
-                     name = 'Life cycle stage',
-                     guide = guide_legend(ncol = 2)) +
-  scale_color_manual(values = colours_val[!names(colours_val) %in% 'E10'],
-                     name = 'Experiment',
-                     guide = guide_legend(ncol = 2)) +
-    xlab('Number of assembled transcripts') +
-    ylab('Percentage of transcripts transcribed over 1 TPM') +
-    theme_classic())
-
-if(global_save_var){
-  ggsave(plot = plot,
-         '/camp/lab/langhornej/working/HPC/littlet/tl22-01_vivaxDeNovo/plots/assemblies_numTranscriptsOver1tpm_totalTranscripts.pdf',
-         device = 'pdf',
-         width = 7,
-         height = 5,
-         units = "in")
-}
-
-(plot <- ggplot(data = filter(over1.df, pir),
-       aes(x = total, 
-           y = over1_perc_pirs,
-           col = experiment_num,
-           shape = stage)) +
-    geom_point(size = 1, stroke = 2, alpha = .75) +
-    #Subset the shapes/colours_val since not all the experiments/stages have any predicted pirs and are hence not included.
-    scale_shape_manual(values=shapes_val[
-      names(shapes_val) %in% unique(filter(over1.df, 
-                                           pir)$stage)
-    ],
-    name = 'Life cycle stage',
-    guide = guide_legend(ncol = 2)) +
-    scale_color_manual(values = colours_val[
-      names(colours_val) %in% unique(filter(over1.df, 
-                                            pir)$experiment_num)
-    ],
-    name = 'Experiment',
-    guide = guide_legend(ncol = 2)) +
-   xlab(expression(paste('Number of assembled ',italic(pir),' transcripts'))) +
-   ylab(expression(paste('Percentage of ',italic(pir),'s transcribed over 1 TPM'))) +
-   theme_classic())
-
-if(global_save_var){
-  ggsave(plot = plot,
-         '/camp/lab/langhornej/working/HPC/littlet/tl22-01_vivaxDeNovo/plots/assemblies_numPirOver1tpm_totalTranscripts.pdf',
-         device = 'pdf',
-         width = 7,
-         height = 5,
-         units = "in")
-}
-
-```
-
