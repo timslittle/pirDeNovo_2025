@@ -685,6 +685,8 @@ biplot(princomp(assigned_subfam_prop.mat))
 
 ```
 
+A number of sub-families have only genomic representatives including the B sub-fam.
+
 ```{r subfam_dis_expt}
 assigned_subfam_num.df <- assigned_subfam.df %>% 
   filter(Complete >= 50) %>% 
@@ -758,11 +760,46 @@ biplot(princomp(t(assigned_subfam_prop.mat)))
 ```
 
 ```{r tpm}
+assigned_subfam_tpm.df <- assigned_subfam.df %>% 
+  filter(Complete >= 50) %>% 
+  select(expt, assembly_id, I1.4, new_subfam_uniq, Complete, TPM_med)
 
+assigned_subfam_tpm_prop.df <- group_by(assigned_subfam_tpm.df, 
+                                        assembly_id, 
+                                        new_subfam_uniq,
+                                        I1.4)  %>% 
+  summarise(TPM_med = sum(TPM_med)) %>% 
+  group_by(assembly_id) %>% 
+  arrange(I1.4) %>% 
+  mutate(prop_tpm = TPM_med/sum(TPM_med)) 
+
+assigned_subfam_tpm_prop.mat <- reshape2::dcast(assigned_subfam_tpm_prop.df, 
+                                                new_subfam_uniq ~ assembly_id, 
+                                                value.var = 'prop_tpm')
+rownames(assigned_subfam_tpm_prop.mat) <- assigned_subfam_tpm_prop.mat$new_subfam_uniq
+#Remove the subfam column now that they are rownames.
+assigned_subfam_tpm_prop.mat$new_subfam_uniq <- NULL
+# Set all NA to zero.
+assigned_subfam_tpm_prop.mat[is.na(assigned_subfam_tpm_prop.mat)] <- 0
+
+# max_col <- max(na.omit(assigned_subfam_prop.mat))
+( tpm_ht <- Heatmap(t(assigned_subfam_tpm_prop.mat)[sort(colnames(assigned_subfam_tpm_prop.mat)),], 
+        na_col = 'white',
+        name = 'Prop subfam',
+        # cluster_rows = FALSE,
+        # cluster_columns = FALSE,
+        row_names_gp = gpar(fontsize = 6),
+        column_names_gp = gpar(fontsize = 6),
+        row_split = 4,
+        # column_split = 4,
+        col = circlize::colorRamp2(c(0,0.0001,
+                                     max(assigned_subfam_tpm_prop.mat)/4,
+                                     max(assigned_subfam_tpm_prop.mat)),
+                                   c('white',viridis::viridis(3)))) )
+draw(tpm_ht + busco_ht)
 ```
 
 ```{r expression}
-colnames(assigned_subfam.df)[22:45] %>% dput
 quant_subfam.df <- left_join(quant.df, 
            select(assigned_subfam.df, c('label', 'Name', 'hmmer_path', "TPM_med", "TPM_max", "TPM_min", "NumReads_med", "NumReads_max", 
                                         "NumReads_min", "I1.4", "new_subfam", "num_pir", "num_transcripts", 
@@ -771,6 +808,18 @@ quant_subfam.df <- left_join(quant.df,
                                         "experiment_id", "new_subfam_uniq", "assembly_id")),
            by = c('Name', 'hmmer_path'))
 
-quant_subfam.df
+quant_subfam_buscoFifty.df <- filter(quant_subfam.df,
+                                     Complete >=50)
+
+lapply(unique(quant_subfam_buscoFifty.df$experiment_id), function(expt.id){
+ expt.df <- quant_subfam_buscoFifty.df[quant_subfam_buscoFifty.df$experiment_id == expt.id,]
+ lapply(unique(expt.df$assembly_id), function(assm.id){
+   assm.df <- expt.df[expt.df$assembly_id == expt.id,]
+ })
+})
+```
+
+```{r ancestral}
+
 ```
 
