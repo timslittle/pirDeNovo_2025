@@ -571,7 +571,9 @@ ggsave('../../plots/vivax_subfamDisI14Network.pdf',
 # write_csv(arrange(assembly_stats.df, expt), 
 #           path = 'assembly_stats.csv')
 
-assembly_stats.df <- read_csv('assembly_stats_lifecycle.csv')
+assembly_stats.df <- read_csv('assembly_stats_lifecycle.csv') %>% 
+  mutate(helpful_id = paste0(experiment_id, '_', helpful_assembly_name),
+         country = str_extract(location, pattern = '(?<=_).+(?=_)'))
 
 # Manually altered the assembly_stats csv file to include life cycle stages and experimental identifiers.
 
@@ -634,8 +636,6 @@ assigned_subfam.df <- inner_join(assigned_subfam.df,
 
 ```
 
-TODO: Split vivax into the three ref genomes.
-
 ```{r subfam_dis_spec}
 
 assigned_subfam_num.df <- assigned_subfam.df %>% 
@@ -644,6 +644,8 @@ assigned_subfam_num.df <- assigned_subfam.df %>%
                           ifelse(species == 'vvx' & str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$'),
                                  'vvxSal1',
                                  species))) %>% 
+  #Filter the de_novo pirs by the BUSCO scores
+  filter(is.na(Complete) | Complete >= 50) %>% 
   group_by(species, I1.4, new_subfam_uniq) %>% 
   summarise(num_genes = n_distinct(label))
 
@@ -689,15 +691,15 @@ A number of sub-families have only genomic representatives including the B sub-f
 
 ```{r subfam_dis_expt}
 assigned_subfam_num.df <- assigned_subfam.df %>% 
-  filter(Complete >= 50) %>% 
-  group_by(expt, assembly_id, I1.4, new_subfam_uniq, Complete) %>% 
+  filter(assembly == 'Meul22_PNG056_vvx' | Complete >= 50) %>% 
+  group_by(expt, helpful_id, country, assembly_id, I1.4, new_subfam_uniq, Complete) %>% 
   summarise(num_genes = n_distinct(label))
 
-ggplot(assigned_subfam_num.df, aes(x = assembly_id, y = num_genes, fill = new_subfam_uniq)) +
+ggplot(assigned_subfam_num.df, aes(x = helpful_id, y = num_genes, fill = new_subfam_uniq)) +
          geom_col(position = 'fill')
 
 assigned_subfam_prop.df <- group_by(assigned_subfam_num.df, 
-                                    assembly_id) %>% 
+                                    helpful_id) %>% 
   arrange(I1.4) %>% 
   mutate(prop_genes = num_genes/sum(num_genes))
 
@@ -706,7 +708,7 @@ assigned_subfam_prop.df$new_subfam_uniq = factor(assigned_subfam_prop.df$new_sub
                                                  levels = unique(assigned_subfam_prop.df$new_subfam_uniq))
 
 assigned_subfam_prop.mat <- reshape2::dcast(assigned_subfam_prop.df, 
-                                            new_subfam_uniq ~ assembly_id, 
+                                            new_subfam_uniq ~ helpful_id, 
                                             value.var = 'prop_genes')
 rownames(assigned_subfam_prop.mat) <- assigned_subfam_prop.mat$new_subfam_uniq
 assigned_subfam_prop.mat$new_subfam_uniq <- NULL
@@ -721,7 +723,7 @@ subfam_ht <- Heatmap(t(assigned_subfam_prop.mat)[sort(colnames(assigned_subfam_p
         row_names_gp = gpar(fontsize = 6),
         column_names_gp = gpar(fontsize = 6),
         row_split = 2,
-        column_split = 4,
+        # column_split = 4,
         col = circlize::colorRamp2(c(0,0.0001,
                                      max(assigned_subfam_prop.mat)/4,
                                      max(assigned_subfam_prop.mat)),
@@ -730,7 +732,7 @@ subfam_ht <- Heatmap(t(assigned_subfam_prop.mat)[sort(colnames(assigned_subfam_p
 # How does this correspond with the BUSCO scores?
 
 busco.mat <- assigned_subfam_prop.df %>% 
-  select(assembly_id, Complete) %>% 
+  select(helpful_id, Complete) %>% 
   mutate(Complete = as.numeric(Complete)) %>% 
   t 
 names_busco.mat <- busco.mat[1,]
@@ -739,21 +741,27 @@ duplicated_val <- !duplicated(names_busco.mat)
 busco.mat <- matrix(busco.mat[duplicated_val])
 rownames(busco.mat) <- names_busco.mat[duplicated_val]
 
-
-# busco.ha <- HeatmapAnnotation(busco = anno_simple(busco.mat))
-
 busco_ht <- Heatmap(busco.mat[sort(rownames(busco.mat)),],
                     name = 'busco',
-        cluster_rows = FALSE,
-        cluster_columns = FALSE,
-        row_names_gp = gpar(fontsize = 6),
-        column_names_gp = gpar(fontsize = 6),
+                    cluster_rows = FALSE,
+                    cluster_columns = FALSE,
+                    show_column_names = FALSE,
                     col = circlize::colorRamp2(c(min(busco.mat),
-                                     (max(busco.mat) + min(busco.mat))/2,
-                                     max(busco.mat)),
-                                   c(viridis::magma(3))))
+                                                 (max(busco.mat) + min(busco.mat))/2,
+                                                 max(busco.mat)),
+                                               c(viridis::magma(3))))
 
-draw(subfam_ht + busco_ht)
+country.mat <- t(as.matrix(reshape2::dcast(unique(select(assigned_subfam_prop.df, helpful_id, country), 
+                                                  by = cols) , 
+                                           1 ~ helpful_id,
+                                           value.var = 'country')[,-1]))
+country_ht <- Heatmap(country.mat,
+                      name = 'source',
+                      row_names_gp = gpar(fontsize = 6),
+                      column_names_gp = gpar(fontsize = 6),
+                      col = c('black', 'blue', 'yellow', 'red', 'grey'))
+
+draw(subfam_ht + busco_ht + country_ht)
 
 biplot(princomp(t(assigned_subfam_prop.mat)))
 
@@ -761,7 +769,7 @@ biplot(princomp(t(assigned_subfam_prop.mat)))
 
 ```{r tpm}
 assigned_subfam_tpm.df <- assigned_subfam.df %>% 
-  filter(Complete >= 50) %>% 
+  filter(assembly == 'Meul22_PNG056_vvx' | Complete >= 50) %>% 
   select(expt, assembly_id, I1.4, new_subfam_uniq, Complete, TPM_med)
 
 assigned_subfam_tpm_prop.df <- group_by(assigned_subfam_tpm.df, 
@@ -783,7 +791,7 @@ assigned_subfam_tpm_prop.mat$new_subfam_uniq <- NULL
 assigned_subfam_tpm_prop.mat[is.na(assigned_subfam_tpm_prop.mat)] <- 0
 
 # max_col <- max(na.omit(assigned_subfam_prop.mat))
-( tpm_ht <- Heatmap(t(assigned_subfam_tpm_prop.mat)[sort(colnames(assigned_subfam_tpm_prop.mat)),], 
+tpm_ht <- Heatmap(t(assigned_subfam_tpm_prop.mat)[sort(colnames(assigned_subfam_tpm_prop.mat)),], 
         na_col = 'white',
         name = 'Prop subfam',
         # cluster_rows = FALSE,
@@ -795,8 +803,54 @@ assigned_subfam_tpm_prop.mat[is.na(assigned_subfam_tpm_prop.mat)] <- 0
         col = circlize::colorRamp2(c(0,0.0001,
                                      max(assigned_subfam_tpm_prop.mat)/4,
                                      max(assigned_subfam_tpm_prop.mat)),
-                                   c('white',viridis::viridis(3)))) )
-draw(tpm_ht + busco_ht)
+                                   c('white',viridis::viridis(3))))
+draw(tpm_ht + busco_ht + country_ht)
+```
+
+```{r}
+assigned_subfam_num.df <- assigned_subfam.df %>% 
+  filter(assembly == 'Meul22_PNG056_vvx' | Complete >= 50) %>% 
+  group_by(country, I1.4, new_subfam_uniq) %>% 
+  summarise(num_genes = n_distinct(label))
+
+ggplot(assigned_subfam_num.df, aes(x = country, y = num_genes, fill = new_subfam_uniq)) +
+         geom_col(position = 'fill')
+
+assigned_subfam_prop.df <- group_by(assigned_subfam_num.df, 
+                                    country) %>% 
+  arrange(I1.4) %>% 
+  mutate(prop_genes = num_genes/sum(num_genes))
+
+# To order the sub-families from largest to smallest in the heatmap.
+assigned_subfam_prop.df$new_subfam_uniq = factor(assigned_subfam_prop.df$new_subfam_uniq, 
+                                                 levels = unique(assigned_subfam_prop.df$new_subfam_uniq))
+
+assigned_subfam_prop.mat <- reshape2::dcast(assigned_subfam_prop.df, 
+                                            new_subfam_uniq ~ country, 
+                                            fun.aggregate = median,
+                                            value.var = 'prop_genes')
+rownames(assigned_subfam_prop.mat) <- assigned_subfam_prop.mat$new_subfam_uniq
+assigned_subfam_prop.mat$new_subfam_uniq <- NULL
+
+assigned_subfam_prop.mat[is.na(assigned_subfam_prop.mat)] <- 0
+# max_col <- max(na.omit(assigned_subfam_prop.mat))
+subfam_ht <- Heatmap(t(assigned_subfam_prop.mat)[sort(colnames(assigned_subfam_prop.mat)),], 
+        na_col = 'white',
+        name = 'Prop subfam',
+        # cluster_rows = FALSE,
+        # cluster_columns = FALSE,
+        row_names_gp = gpar(fontsize = 6),
+        column_names_gp = gpar(fontsize = 6),
+        # row_split = 2,
+        # column_split = 4,
+        col = circlize::colorRamp2(c(0,0.0001,
+                                     max(assigned_subfam_prop.mat)/4,
+                                     max(assigned_subfam_prop.mat)),
+                                   c('white',viridis::viridis(3))))
+
+draw(subfam_ht)
+
+biplot(princomp(t(assigned_subfam_prop.mat)))
 ```
 
 ```{r expression}
