@@ -877,7 +877,30 @@ quant_subfam_buscoFifty.df <- filter(quant_subfam.df,
 lapply(unique(quant_subfam_buscoFifty.df$experiment_id), function(expt.id){
  expt.df <- quant_subfam_buscoFifty.df[quant_subfam_buscoFifty.df$experiment_id == expt.id,]
  lapply(unique(expt.df$assembly_id), function(assm.id){
-   assm.df <- expt.df[expt.df$assembly_id == expt.id,]
+   assm.df <- expt.df[expt.df$assembly_id == assm.id,] %>% filter(TPM_max >= 20)
+   if(nrow(assm.df) == 0) {return(NULL)}
+   tpm.df <- reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med ~ sample, value.var = 'TPM') %>% 
+     arrange(desc(TPM_med)) %>% 
+     #Use factors here to order by the largest TPM_median sub-families.
+     mutate(new_subfam_uniq = factor(new_subfam_uniq, levels = unique(new_subfam_uniq))) %>% 
+     arrange(new_subfam_uniq, desc(TPM_med)) %>% 
+     tibble::column_to_rownames(var = 'label')
+   tpm.mat <- as.matrix(select(tpm.df, -new_subfam_uniq, -TPM_med))
+   subfam.mat <- as.matrix(select(tpm.df, new_subfam_uniq))
+   return(draw( Heatmap(tpm.mat, 
+                 cluster_rows = FALSE, 
+                 cluster_columns = FALSE,
+                 column_names_gp = gpar(fontsize = 7),
+                 row_split = factor(c(subfam.mat), levels = unique(subfam.mat)),
+                 row_title_rot = 0,
+                 show_row_names = FALSE,
+                 name = 'TPM') 
+                # + Heatmap(subfam.mat, 
+                #                                                  show_row_names = FALSE,
+                #                                                  column_names_gp = gpar(fontsize = 7),
+                #                          name = 'sub-family') 
+                )
+          )
  })
 })
 ```
