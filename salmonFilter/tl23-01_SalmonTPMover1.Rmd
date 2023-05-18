@@ -679,11 +679,17 @@ Heatmap(t(assigned_subfam_prop.mat[1:26,]),
         # column_split = 3,
         row_names_gp = gpar(fontsize = 6),
         col = circlize::colorRamp2(c(0,0.0001,
-                                     max(assigned_subfam_prop.mat)/4,
+                                     max(assigned_subfam_prop.mat)/8,
                                      max(assigned_subfam_prop.mat)),
                                    c('white',viridis::viridis(3))))
 
-biplot(princomp(assigned_subfam_prop.mat))
+biplot(prcomp(t(assigned_subfam_prop.mat)))
+
+pca_spec_subset <- prcomp(t(assigned_subfam_prop.mat[, 
+                                         str_detect(colnames(assigned_subfam_prop.mat), 
+                                                    pattern = 'vvx|de_novo|ovale|cyno')]))
+summary(pca_spec_subset)
+biplot(pca_spec_subset)
 
 ```
 
@@ -759,17 +765,19 @@ country_ht <- Heatmap(country.mat,
                       name = 'source',
                       row_names_gp = gpar(fontsize = 6),
                       column_names_gp = gpar(fontsize = 6),
-                      col = c('black', 'blue', 'yellow', 'red', 'grey'))
+                      col = c('black', 'blue', 'yellow', 'red', 'grey', 'hotpink')[1:length(unique(country.mat))])
 
 draw(subfam_ht + busco_ht + country_ht)
 
-biplot(princomp(t(assigned_subfam_prop.mat)))
+biplot(princomp(t(assigned_subfam_prop.mat), scale = TRUE, center = TRUE))
 
 ```
 
 ```{r tpm}
 assigned_subfam_tpm.df <- assigned_subfam.df %>% 
-  filter(assembly == 'Meul22_PNG056_vvx' | Complete >= 50) %>% 
+  filter(assembly == 'Meul22_PNG056_vvx' | Complete >= 50
+         # ,str_detect(new_subfam_uniq, pattern = 'E|I')
+         ) %>% 
   select(expt, assembly_id, I1.4, new_subfam_uniq, Complete, TPM_med)
 
 assigned_subfam_tpm_prop.df <- group_by(assigned_subfam_tpm.df, 
@@ -793,7 +801,7 @@ assigned_subfam_tpm_prop.mat[is.na(assigned_subfam_tpm_prop.mat)] <- 0
 # max_col <- max(na.omit(assigned_subfam_prop.mat))
 tpm_ht <- Heatmap(t(assigned_subfam_tpm_prop.mat)[sort(colnames(assigned_subfam_tpm_prop.mat)),], 
         na_col = 'white',
-        name = 'Prop subfam',
+        name = 'Prop TPM',
         # cluster_rows = FALSE,
         # cluster_columns = FALSE,
         row_names_gp = gpar(fontsize = 6),
@@ -850,8 +858,9 @@ subfam_ht <- Heatmap(t(assigned_subfam_prop.mat)[sort(colnames(assigned_subfam_p
 
 draw(subfam_ht)
 
-biplot(princomp(t(assigned_subfam_prop.mat)))
 ```
+
+From limited data perhaps PNG (Both the de novo and the P01) is depleted for the largest sub-families (Es).
 
 ```{r expression}
 quant_subfam.df <- left_join(quant.df, 
