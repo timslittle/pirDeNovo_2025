@@ -466,7 +466,7 @@ lapply( str_subset(colnames(gephi_mcl.df), pattern = '^I[[:digit:]]'),
           breaks_y <- seq(0, plyr::round_any(max_y, 5, ceiling), 5)
           
           (subfam_graph.plot <- ggplot(subfam_graph.df, aes(x = infl_net, y = number, fill = subfam)) +
-              geom_col(postion = 'stack') +
+              geom_col(position = 'stack') +
               xlab('Cluster ID (total number of pirs in cluster)') +
               ylab('Number of Sal1 pirs') +
               scale_fill_manual(values = subfam_col, 
@@ -504,7 +504,7 @@ max_y <- max(summarise(group_by(subfam_graph.df, infl_net), sum_num = sum(number
 breaks_y <- seq(0, plyr::round_any(max_y, 5, ceiling), 5)
 
 (subfam_graph.plot <- ggplot(subfam_graph.df, aes(x = infl_net, y = number, fill = subfam)) +
-    geom_col(postion = 'stack') +
+    geom_col(position = 'stack') +
     xlab('Cluster ID (total number of pirs in cluster)') +
     ylab('Number of Sal1 pirs') +
     scale_fill_manual(values = subfam_col, 
