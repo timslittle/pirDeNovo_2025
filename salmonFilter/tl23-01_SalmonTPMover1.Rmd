@@ -13,13 +13,19 @@ output:
 
 # Intro
 
-This script filters the de novo transcripts from P. vivax for those that match pirs, and are expressed.
+This script filters the _de novo_ transcripts from _P. vivax_ for those that match _pir_s (HMM coverage > 75%), and are expressed (Both TPM and Number of Reads greater than 1 in at least one sample).
+
+Different experiments are denoted by an experiment code of the following structure: 
+* (Lifecycle stage)(Geographical Source)(Year of publication).
+E.g. AsexCamb19 = Aexual stages, Cambodia, 2019. MixdBraz22 = Mixed stages, Brazil, 2022.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, 
-                      results = TRUE, 
+                      results = FALSE, 
                       message = FALSE, 
-                      warning = FALSE)
+                      warning = FALSE,
+                      fig.show = FALSE)
+# Default hide output in knitr
 options(scipen = 999) 
 # Means that numbers are displayed normally not as 1e6 (1000000)
 ```
@@ -121,7 +127,6 @@ read_HMMertxtgz <- function(hmmer_gz.path) {
   return(hmmer_gz.df)
 }
 ```
-
 
 ```{r load_salmon}
 # experiment.vec <- c('Bourgard21')
@@ -236,7 +241,8 @@ quant.df <- read.csv(file = 'salmonQuant_all.csv')
 # write_csv(quant_filtered.df, path = 'salmonQuant_filtered.csv')
 quant_filtered.df <- read.csv('salmonQuant_filtered.csv')
 
-hist(na.omit(quant.df$hmm_cvrg_perc), breaks = 1000)
+'HMM Plasmodium_vir coverage for each sequence' <- na.omit(quant.df$hmm_cvrg_perc)
+hist(`HMM Plasmodium_vir coverage for each sequence`, breaks = 1000, cex.main = 1)
 hist(quant_filtered.df$hmm_cvrg_perc, breaks = 100)
 
 # quant_filtered.df %>% filter(TPM < 1)
@@ -257,9 +263,19 @@ mutate(quant_stats.df,expt = str_extract(assembly, pattern = '^[[:alpha:]]+[[:di
 sum(quant_stats.df$num_pir_filt)
 ```
 
-Extract the fasta files of pirs expressed above threshold. 
+# Histogram of HMM % coverage across the _de novo pir_\s
+
+Higher percentage indicates a greater coverage of the input HMM model across the _de novo_ sequence. 100% means the entire model was covered. I chose 75% as a cut-off for this to count as a full _pir_ sequence. I believe this histogram indicates many fragmentary transcripts, either due to incomplete or erroneous assembly, or pseudogenic sequence.
+
+```{r show_hist, fig.show=TRUE}
+
+hist(`HMM Plasmodium_vir coverage for each sequence`, breaks = 1000, cex.main = 1)
+
+```
 
 ```{r fasta}
+# Extract the fasta files of pirs expressed above threshold. 
+
 #Note that this function appends to an existing file so be sure to remove it if it already exists.
 #Save date for file name.
 # date.str <- format(Sys.time(), "%d%b")
@@ -276,9 +292,10 @@ Extract the fasta files of pirs expressed above threshold.
 #        }) 
 ```
 
-Make the node.df file for graph design. Using the concatenated fasta file of the above filtered de novo pirs and reference gene pirs.
 
 ```{r subfam}
+# Make the node.df file for graph design. Using the concatenated fasta file of the above filtered de novo pirs and reference gene pirs.
+
 lopez13_sal1Subfam <- read.table('../../../tl22-02_VirSubfamNetwork/pir_info/lopez13_vir_subfam.txt', 
                                  col.names = c('name','subfam'),
                                  stringsAsFactors = FALSE)
@@ -329,9 +346,9 @@ write_csv(subfam.df,
           path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_Sal1subfam.csv')
 ```
 
-Preparing the data for Gephi input requires some special treatment, including making a number for each node.
-
 ```{r gephi}
+# Preparing the data for Gephi input requires some special treatment, including making a number for each node.
+
 # Get the info for all the sequences for later.
 quant_sequence.df <- mutate(quant.df, 
                                       Name_assembly = paste0(Name, '_', assembly)) %>% 
@@ -370,6 +387,8 @@ gephi.df <- mutate(subfam.df,
 
 ```
 
+# Clustering algorithm
+
 ```{r mcl}
 mcl.files <- list.files(path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_mcl',
            pattern = 'deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_all2all.mci.I.+list',
@@ -388,7 +407,7 @@ write_csv(gephi_mcl.df,
           path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_info.csv')
 ```
 
-```{r best_network}
+```{r best_network, show = FALSE}
 filter(gephi_mcl.df, 
        str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$')) %>%
   select(Id, label, subfam, starts_with('I')) %>% 
@@ -413,7 +432,13 @@ gephi_mcl.df %>%
   arrange(I1.4, desc(perc_I))
 ```
 
-```{r subfam_graph}
+Clustering algorithm MCL was used on the network of _de novo pir_\s. For this method the 'Inflation' value was varied, which more-or-less controls the number of total clusters the sequences are assigned to (lower inflation = fewer, larger clusters). To test the best value of Inflation I to use, I tested it over multiple values and then assessed how the Sal1 sub-families are distributed across these clusters, as plotted below. 
+
+I decided that I1.4 (Inflation value of 1.4) worked the best as the Sal1 sub-families minimally mixed within the clusters. I noted that no matter the Inflation value, the existing sub-families tended not to mix together unless very small values were used (so clusters were highly mixed).
+
+Based on these results I named the different clusters using the majority Sal1 sub-family of each cluster, so long as that cluster had at least five members from a Sal1 sub-family. Some single sub-families are separated into multiple clusters, such as E_1 to E_4. Clusters without Sal1 sub-family members were called new_1 etc. Completely new names should probably be defined for all of these.
+
+```{r subfam_graph, fig.show = TRUE}
 subfam_col <- safe_colorblind_palette
 names(subfam_col) <- c('E','G','K','J','I','B','C')
 
@@ -449,7 +474,8 @@ lapply( str_subset(colnames(gephi_mcl.df), pattern = '^I[[:digit:]]'),
                                  # limits = c(0, max(breaks_y))
               ) +
               theme_classic()+
-              theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) )
+              theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+              ggtitle(paste0('Inflation value = ', infl)))
         })
 ```
 
@@ -545,6 +571,14 @@ ggsave('../../plots/vivax_subfamDisI14Network.pdf',
 
 ```
 
+# Assembly statistics
+
+Plots of the number of _de novo pir_\s vs quality score (BUSCOs - percentage of conserved orthologs expected in the assemblies that were actually found), separated into mosquito and human-infection parasite stages.
+
+Mosquito stages show low-to-no _de novo pir_\s even with decent BUSCO results, with the exception of MosqPeru23 results which included fresher blood meals.
+
+Asexual stages show that better assemblies demonstrate better _de novo pir_ recoveries. There is no plateau of the _pir_ numbers, demonstrating that these assemblies are only capturing a subset of the total _pir_ transcriptome, as expected. Note that one SchzMixd22 (from Papua New Guinea) sample shows exceptional _de novo pir_ numbers (373) despite low BUSCO score.
+
 ```{r assembly_stats}
 # assembly_numTranscript <- quant_sequence.df %>% 
 #   group_by(assembly,fasta_path) %>% 
@@ -602,13 +636,9 @@ assembly_stats.df[assembly_stats.df$Complete <= 50,] %>% arrange(num_pir)
 
 ```
 
-Doens't plateau, as expected this is probably an underestimate of the total pir transcriptome.
-
-Annoyingly 50% Complete BUSCO excludes Meul22_PNG056 (373 pirs) and all other PNG pir samples.
-
-Define subfam for each cluster based on the most frequent sub-family in each cluster, but only if there's at least five members in the cluster.
-
 ```{r assign_subfam_to_clusters}
+# Define subfam for each cluster based on the most frequent sub-family in each cluster, but only if there's at least five members in the cluster.
+
 assigned_subfam.df <- gephi_mcl.df %>% 
   select(-c(starts_with('I')), I1.4) %>% 
   group_by(I1.4) %>% 
@@ -636,7 +666,19 @@ assigned_subfam.df <- inner_join(assigned_subfam.df,
 
 ```
 
-```{r subfam_dis_spec}
+# Sub-family distributions across different sources of _pir_\s
+
+## Sub-family distributions across the *number*s of _pir_\s from different *species*.
+
+When generating the BLAST similarity network I included _pir_\s from other closely related species as well as the Sal1, P01 and W1 _P. vivax_ reference genomes. This heatmap shows the proportion of the total _pir_\s  for each species/vivax genome that belong to each sub-family. 
+
+Note that the colour scale is skewed to show low proportions, as otherwise the genomes dominated by only one or two sub-families make the heatmap only yellow and blue.
+
+_P. knowlesi_ and _coatneyi_ are the most divergent, only showing a few overlapping _pir_ sub-families with the other species. The _P. vivax_ genomes, the _de novo P. vivax_ sequences, and the _P. vivax-like_ and _P. cynomolgi_ genomes contain most of the sub-families defined. 
+
+Interestingly by this metric the hierarchical clustering of the heatmap separates the _de novo_ sequences out with Sal1 and _P. vivax-like_. I'm not sure what to read into this, as it isn't clear why the clustering has done that. Note that the _de novo_ sequences do not include sub-family B, but _pir_\s of this ilk are indeed present in all three reference genomes. This is likely an un/lowly-expressed sub-family.
+
+```{r subfam_dis_spec, fig.show = TRUE}
 
 assigned_subfam_num.df <- assigned_subfam.df %>% 
   mutate(species = ifelse(species == 'vvx' & !str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$') ,
@@ -649,8 +691,8 @@ assigned_subfam_num.df <- assigned_subfam.df %>%
   group_by(species, I1.4, new_subfam_uniq) %>% 
   summarise(num_genes = n_distinct(label))
 
-ggplot(assigned_subfam_num.df, aes(x = species, y = num_genes, fill = new_subfam_uniq)) +
-         geom_col(position = 'fill')
+# ggplot(assigned_subfam_num.df, aes(x = species, y = num_genes, fill = new_subfam_uniq)) +
+#          geom_col(position = 'fill')
 
 assigned_subfam_prop.df <- group_by(assigned_subfam_num.df, 
                                     species) %>% 
@@ -681,28 +723,40 @@ Heatmap(t(assigned_subfam_prop.mat[1:26,]),
         col = circlize::colorRamp2(c(0,0.0001,
                                      max(assigned_subfam_prop.mat)/8,
                                      max(assigned_subfam_prop.mat)),
-                                   c('white',viridis::viridis(3))))
+                                   c('white',viridis::viridis(3))),
+        name = 'Proportion of\n pir numbers',
+        )
 
-biplot(prcomp(t(assigned_subfam_prop.mat)))
-
-pca_spec_subset <- prcomp(t(assigned_subfam_prop.mat[, 
-                                         str_detect(colnames(assigned_subfam_prop.mat), 
-                                                    pattern = 'vvx|de_novo|ovale|cyno')]))
-summary(pca_spec_subset)
-biplot(pca_spec_subset)
+# biplot(prcomp(t(assigned_subfam_prop.mat)))
+# 
+# pca_spec_subset <- prcomp(t(assigned_subfam_prop.mat[, 
+#                                          str_detect(colnames(assigned_subfam_prop.mat), 
+#                                                     pattern = 'vvx|de_novo|ovale|cyno')]))
+# summary(pca_spec_subset)
+# biplot(pca_spec_subset)
 
 ```
 
-A number of sub-families have only genomic representatives including the B sub-fam.
+## Sub-family distributions across the *number*s of _pir_\s from different *assemblies*.
 
-```{r subfam_dis_expt}
+Now I'm focussing on the individual assemblies, defined by their experiment ID (see the beginning of this doc) and an assembly ID after the underscore.
+
+Assemblies were included if they had >= 50% complete BUSCO score (as a quality filter), except for the exceptional PNG _pir_ sample which was also included.
+
+The BUSCO score and the country of origin is included beside the main heatmap. 
+
+I think the heatmap is still mostly splitting based on the number of _pir_ sub-families found in the data, and this is roughly correlated with the group of assemblies with lower BUSCO scores (the bottom 'chunk').
+
+Beyond that, finding patterns is tricky. Certainly looks to me like most samples, even from very different regions, tend to have transcripts for a range of the same sub-families.
+
+```{r subfam_dis_expt, show.fig = TRUE}
 assigned_subfam_num.df <- assigned_subfam.df %>% 
   filter(assembly == 'Meul22_PNG056_vvx' | Complete >= 50) %>% 
   group_by(expt, helpful_id, country, assembly_id, I1.4, new_subfam_uniq, Complete) %>% 
   summarise(num_genes = n_distinct(label))
 
-ggplot(assigned_subfam_num.df, aes(x = helpful_id, y = num_genes, fill = new_subfam_uniq)) +
-         geom_col(position = 'fill')
+# ggplot(assigned_subfam_num.df, aes(x = helpful_id, y = num_genes, fill = new_subfam_uniq)) +
+#          geom_col(position = 'fill')
 
 assigned_subfam_prop.df <- group_by(assigned_subfam_num.df, 
                                     helpful_id) %>% 
@@ -769,9 +823,17 @@ country_ht <- Heatmap(country.mat,
 
 draw(subfam_ht + busco_ht + country_ht)
 
-biplot(princomp(t(assigned_subfam_prop.mat), scale = TRUE, center = TRUE))
+# biplot(princomp(t(assigned_subfam_prop.mat), scale = TRUE, center = TRUE))
 
 ```
+
+## Sub-family distributions across the *transcription (TPM)* of _pir_\s from different *assemblies*.
+
+Similar heatmap to above except now the proportions are proportion of total expression, as measured in the median TPM of each sample that contributed to the assembly.
+
+Note that max transcription was used to define whether a _pir_ was a real signal or not, so it only had to be transcribed above the thresholds described at the top of this document in at least a single sample. Median TPM for many of these _pir_\s is virtually zero, demonstrating transcription only in under half of samples. The expression of sub-families across different samples (the next section) should enlighten this.
+
+Once again expression is found across most sub-families for most samples, no matter the source. The hiararchical clustering does separate a few Peruvian samples together, although the source of this difference is tricky to elucidate. There is some enhanced sub-family G, I_1 and I_2 expression in these samples, but this doesn't hold for all them, let alone all the Peruvian samples.
 
 ```{r tpm}
 assigned_subfam_tpm.df <- assigned_subfam.df %>% 
@@ -818,8 +880,10 @@ draw(tpm_ht + busco_ht + country_ht)
 ```{r}
 assigned_subfam_num.df <- assigned_subfam.df %>% 
   filter(assembly == 'Meul22_PNG056_vvx' | Complete >= 50) %>% 
+  group_by(country) %>% 
+  mutate(country = paste0(country, ' (n = ', n_distinct(assembly),')')) %>% 
   group_by(country, I1.4, new_subfam_uniq) %>% 
-  summarise(num_genes = n_distinct(label))
+  summarise(num_genes = n_distinct(label)) 
 
 ggplot(assigned_subfam_num.df, aes(x = country, y = num_genes, fill = new_subfam_uniq)) +
          geom_col(position = 'fill')
@@ -858,11 +922,19 @@ subfam_ht <- Heatmap(t(assigned_subfam_prop.mat)[sort(colnames(assigned_subfam_p
 
 draw(subfam_ht)
 
+#From limited data perhaps PNG (Both the de novo and the P01) is depleted for the largest sub-families (Es).
+
 ```
 
-From limited data perhaps PNG (Both the de novo and the P01) is depleted for the largest sub-families (Es).
+# Expression heatmaps of the _de novo_ _pir_\s, split by sub-family, across the samples in each assembly.
 
-```{r expression}
+These are still pretty messy, and I have yet to add informative sample names (the columns of the heatmap). Maybe the bar charts (that I did last time) would look better for this purpose? Or additional?
+
+Each heatmap represents the samples used for one assembly, and shows the TPM values of _de novo pir_\s in each sample aligned to their assembly, separated by the sub-family they're from. 
+
+To reduce the sizes of the heatmaps to informative levels I used a further threshold, only including _pir_\s with a maximum TPM in one sample of at least 20 TPM.
+
+```{r expression, show.fig = TRUE}
 quant_subfam.df <- left_join(quant.df, 
            select(assigned_subfam.df, c('label', 'Name', 'hmmer_path', "TPM_med", "TPM_max", "TPM_min", "NumReads_med", "NumReads_max", 
                                         "NumReads_min", "I1.4", "new_subfam", "num_pir", "num_transcripts", 
@@ -875,33 +947,34 @@ quant_subfam_buscoFifty.df <- filter(quant_subfam.df,
                                      Complete >=50)
 
 lapply(unique(quant_subfam_buscoFifty.df$experiment_id), function(expt.id){
- expt.df <- quant_subfam_buscoFifty.df[quant_subfam_buscoFifty.df$experiment_id == expt.id,]
- lapply(unique(expt.df$assembly_id), function(assm.id){
-   assm.df <- expt.df[expt.df$assembly_id == assm.id,] %>% filter(TPM_max >= 20)
-   if(nrow(assm.df) == 0) {return(NULL)}
-   tpm.df <- reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med ~ sample, value.var = 'TPM') %>% 
-     arrange(desc(TPM_med)) %>% 
-     #Use factors here to order by the largest TPM_median sub-families.
-     mutate(new_subfam_uniq = factor(new_subfam_uniq, levels = unique(new_subfam_uniq))) %>% 
-     arrange(new_subfam_uniq, desc(TPM_med)) %>% 
-     tibble::column_to_rownames(var = 'label')
-   tpm.mat <- as.matrix(select(tpm.df, -new_subfam_uniq, -TPM_med))
-   subfam.mat <- as.matrix(select(tpm.df, new_subfam_uniq))
-   return(draw( Heatmap(tpm.mat, 
-                 cluster_rows = FALSE, 
-                 cluster_columns = FALSE,
-                 column_names_gp = gpar(fontsize = 7),
-                 row_split = factor(c(subfam.mat), levels = unique(subfam.mat)),
-                 row_title_rot = 0,
-                 show_row_names = FALSE,
-                 name = 'TPM') 
-                # + Heatmap(subfam.mat, 
-                #                                                  show_row_names = FALSE,
-                #                                                  column_names_gp = gpar(fontsize = 7),
-                #                          name = 'sub-family') 
-                )
-          )
- })
+  expt.df <- quant_subfam_buscoFifty.df[quant_subfam_buscoFifty.df$experiment_id == expt.id,]
+  lapply(unique(expt.df$assembly_id), function(assm.id){
+    assm.df <- expt.df[expt.df$assembly_id == assm.id,] %>% filter(TPM_max >= 20)
+    if(nrow(assm.df) == 0) {return(NULL)}
+    tpm.df <- reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med ~ sample, value.var = 'TPM') %>% 
+      arrange(desc(TPM_med)) %>% 
+      #Use factors here to order by the largest TPM_median sub-families.
+      mutate(new_subfam_uniq = factor(new_subfam_uniq, levels = unique(new_subfam_uniq))) %>% 
+      arrange(new_subfam_uniq, desc(TPM_med)) %>% 
+      tibble::column_to_rownames(var = 'label')
+    tpm.mat <- as.matrix(select(tpm.df, -new_subfam_uniq, -TPM_med))
+    subfam.mat <- as.matrix(select(tpm.df, new_subfam_uniq))
+    draw( Heatmap(tpm.mat, 
+                  cluster_rows = FALSE, 
+                  cluster_columns = FALSE,
+                  column_names_gp = gpar(fontsize = 7),
+                  row_split = factor(c(subfam.mat), levels = unique(subfam.mat)),
+                  row_title_rot = 0,
+                  show_row_names = FALSE,
+                  name = 'TPM',
+                  column_title = assm.id) 
+          # + Heatmap(subfam.mat, 
+          #                                                  show_row_names = FALSE,
+          #                                                  column_names_gp = gpar(fontsize = 7),
+          #                          name = 'sub-family') 
+    )
+    return()
+  })
 })
 ```
 
