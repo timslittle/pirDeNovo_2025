@@ -503,17 +503,17 @@ subfam_graph.df <- gephi_mcl.df %>%
 max_y <- max(summarise(group_by(subfam_graph.df, infl_net), sum_num = sum(number))$sum_num)
 breaks_y <- seq(0, plyr::round_any(max_y, 5, ceiling), 5)
 
-(subfam_graph.plot <- ggplot(subfam_graph.df, aes(x = infl_net, y = number, fill = subfam)) +
-    geom_col(position = 'stack') +
-    xlab('Cluster ID (total number of pirs in cluster)') +
-    ylab('Number of Sal1 pirs') +
-    scale_fill_manual(values = subfam_col, 
-                      name = 'Sal1 sub-family') +
-    scale_y_continuous(breaks = breaks_y, 
-                       # limits = c(0, max(breaks_y))
-    ) +
-    theme_classic()+
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) )
+# subfam_graph.plot <- ggplot(subfam_graph.df, aes(x = infl_net, y = number, fill = subfam)) +
+#     geom_col(position = 'stack') +
+#     xlab('Cluster ID (total number of pirs in cluster)') +
+#     ylab('Number of Sal1 pirs') +
+#     scale_fill_manual(values = subfam_col, 
+#                       name = 'Sal1 sub-family') +
+#     scale_y_continuous(breaks = breaks_y, 
+#                        # limits = c(0, max(breaks_y))
+#     ) +
+#     theme_classic()+
+#     theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
 
 ggsave('../../plots/vivax_subfamDisI14Network.pdf', 
        subfam_graph.plot)
@@ -669,7 +669,7 @@ assigned_subfam.df <- inner_join(assigned_subfam.df,
 
 # Sub-family distributions across different sources of _pir_\s
 
-## Sub-family distributions across the *number*s of _pir_\s from different *species*.
+## Sub-family distributions across the **numbers** of _pir_\s from different **species**.
 
 When generating the BLAST similarity network I included _pir_\s from other closely related species as well as the Sal1, P01 and W1 _P. vivax_ reference genomes. This heatmap shows the proportion of the total _pir_\s  for each species/vivax genome that belong to each sub-family. 
 
@@ -736,7 +736,7 @@ Heatmap(t(assigned_subfam_prop.mat[1:26,]),
 
 ```
 
-## Sub-family distributions across the *number*s of _pir_\s from different *assemblies*.
+## Sub-family distributions across the **numbers** of _pir_\s from different **assemblies**.
 
 Now I'm focussing on the individual assemblies, defined by their experiment ID (see the beginning of this doc) and an assembly ID after the underscore.
 
@@ -826,7 +826,7 @@ draw(subfam_ht + busco_ht + country_ht)
 
 ```
 
-## Sub-family distributions across the *transcription (TPM)* of _pir_\s from different *assemblies*.
+## Sub-family distributions across the **transcription (TPM)** of _pir_\\s from different **assemblies**.
 
 Similar heatmap to above except now the proportions are proportion of total expression, as measured in the median TPM of each sample that contributed to the assembly.
 
@@ -884,8 +884,8 @@ assigned_subfam_num.df <- assigned_subfam.df %>%
   group_by(country, I1.4, new_subfam_uniq) %>% 
   summarise(num_genes = n_distinct(label)) 
 
-ggplot(assigned_subfam_num.df, aes(x = country, y = num_genes, fill = new_subfam_uniq)) +
-         geom_col(position = 'fill')
+# ggplot(assigned_subfam_num.df, aes(x = country, y = num_genes, fill = new_subfam_uniq)) +
+#          geom_col(position = 'fill')
 
 assigned_subfam_prop.df <- group_by(assigned_subfam_num.df, 
                                     country) %>% 
@@ -919,7 +919,7 @@ subfam_ht <- Heatmap(t(assigned_subfam_prop.mat)[sort(colnames(assigned_subfam_p
                                      max(assigned_subfam_prop.mat)),
                                    c('white',viridis::viridis(3))))
 
-draw(subfam_ht)
+# draw(subfam_ht)
 
 #From limited data perhaps PNG (Both the de novo and the P01) is depleted for the largest sub-families (Es).
 
