@@ -41,6 +41,7 @@ library('kableExtra')
 library('rmarkdown')
 library('seqinr')
 library('ggplot2')
+library('ComplexHeatmap')
 
 safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
                              "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888")
@@ -708,8 +709,6 @@ assigned_subfam_prop.mat <- reshape2::dcast(assigned_subfam_prop.df,
                                             value.var = 'prop_genes')
 rownames(assigned_subfam_prop.mat) <- assigned_subfam_prop.mat$new_subfam_uniq
 assigned_subfam_prop.mat$new_subfam_uniq <- NULL
-
-library('ComplexHeatmap')
 
 assigned_subfam_prop.mat[is.na(assigned_subfam_prop.mat)] <- 0
 # max_col <- max(na.omit(assigned_subfam_prop.mat))
