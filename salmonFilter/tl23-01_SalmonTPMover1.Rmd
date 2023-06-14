@@ -686,6 +686,15 @@ assigned_subfam.df <- inner_join(assigned_subfam.df,
 
 ```
 
+## Ancestral _de novo pir_\ s.
+
+```{r ancestral_subfam}
+
+filter(assigned_subfam.df, label %in% ancestral_genes_denovo)
+
+```
+
+
 # Sub-family distributions across different sources of _pir_ \s.
 
 ## Sub-family distributions across the **numbers** of _pir_ \s from different **species**.
@@ -977,13 +986,19 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id), function(expt.id){
       tibble::column_to_rownames(var = 'label')
     tpm.mat <- as.matrix(select(tpm.df, -new_subfam_uniq, -TPM_med))
     subfam.mat <- as.matrix(select(tpm.df, new_subfam_uniq))
+    
+    #Ancestral gene name only
+    rownames(tpm.mat) <- ifelse(rownames(tpm.mat) %in% ancestral_genes_denovo,
+                                'anc',
+                                '')
+    
     draw( Heatmap(tpm.mat, 
                   cluster_rows = FALSE, 
                   cluster_columns = FALSE,
                   column_names_gp = gpar(fontsize = 7),
                   row_split = factor(c(subfam.mat), levels = unique(subfam.mat)),
                   row_title_rot = 0,
-                  show_row_names = FALSE,
+                  show_row_names = TRUE,
                   name = 'TPM',
                   column_title = assm.id) 
           # + Heatmap(subfam.mat, 
