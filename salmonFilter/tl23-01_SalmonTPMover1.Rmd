@@ -515,17 +515,18 @@ breaks_y <- seq(0, plyr::round_any(max_y, 5, ceiling), 5)
 #     theme_classic()+
 #     theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
 
-ggsave('../../plots/vivax_subfamDisI14Network.pdf', 
-       subfam_graph.plot)
+# ggsave('../../plots/vivax_subfamDisI14Network.pdf', 
+#        subfam_graph.plot)
 
 ```
 
 
 ```{r node}
 # Comment out when not needed as this takes a long time.
-
+# 
 # blast.df <- read.table('../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_all2all.blast',
-#                       col.names = unlist(strsplit(c('qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs qcovhsp slen nident'), split = ' ')))
+#                        col.names = unlist(strsplit(c('qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs qcovhsp slen nident'), 
+#                                                    split = ' ')))
 # 
 # # Duplicate removal removes many more than expected due to multiple different alignments from the same sequences.
 # #   TODO: How should I deal with these? Would be ideal to combine but this would take a while. May take lazy way out and just take the best match.
@@ -544,31 +545,49 @@ ggsave('../../plots/vivax_subfamDisI14Network.pdf',
 # 
 # blast_filt_dedup.df <- blast_filt.df[!blast_filt_dup,]
 # 
-# #Test that best match is returned.
+# write_csv(blast_filt_dedup.df,
+#           '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_blastFilt.csv')
+
+blast_filt_dedup.df <- read_csv('../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_blastFilt.csv')
+
+#Test that best match is returned.
 # pattern_filter <- 'NonamEVm000789t1_Cheng19_ERX2560129-ERR2541711_vvx|PVP01_0600400'
 # pattern_filter <- 'PcyM_1354500|PocGH01_00134500'
 # pattern_filter <- 'PVP01_0003840|PVW1_140089200'
 # 
-# filter(blast_filt_dedup.df, 
-#        grepl(qseqid, 
-#              pattern = pattern_filter), 
-#        grepl(sseqid, 
+# filter(blast_filt_dedup.df,
+#        grepl(qseqid,
+#              pattern = pattern_filter),
+#        grepl(sseqid,
 #              pattern = pattern_filter))
 # 
-# filter(blast.df, 
-#        grepl(qseqid, 
-#                        pattern = pattern_filter), 
-#        grepl(sseqid, 
+# filter(blast.df,
+#        grepl(qseqid,
+#              pattern = pattern_filter),
+#        grepl(sseqid,
 #              pattern = pattern_filter))
-# 
-# edges.df <- mutate(blast_filt_dedup.df, 
-#        Source = gephi.df$Id[match(qseqid, gephi.df$label)],
-#        Target = gephi.df$Id[match(sseqid, gephi.df$label)],
-#        Type = 'undirected') %>% 
-#   select(Source, Target, Type)
-# 
-# write_csv(edges.df, 
-#           '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_edges.csv')
+
+#Ancestral gene
+
+ancestral_genes <- c('PVX_113230',
+                     'PVW1_110053600',
+                     'PVP01_1147700')
+
+ancestral_blast.df <- filter(blast_filt_dedup.df,
+       str_detect(qseqid, pattern = ancestral_genes) | str_detect(sseqid, pattern = ancestral_genes)) %>% 
+  arrange(desc(bitscore)) %>% 
+  filter(pident >= 95)
+
+ancestral_genes_denovo <- unique(c(ancestral_blast.df$qseqid, ancestral_blast.df$sseqid))
+
+edges.df <- mutate(blast_filt_dedup.df,
+       Source = gephi.df$Id[match(qseqid, gephi.df$label)],
+       Target = gephi.df$Id[match(sseqid, gephi.df$label)],
+       Type = 'undirected') %>%
+  select(Source, Target, Type)
+
+write_csv(edges.df,
+          '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_edges.csv')
 
 ```
 
@@ -667,9 +686,9 @@ assigned_subfam.df <- inner_join(assigned_subfam.df,
 
 ```
 
-# Sub-family distributions across different sources of _pir_\s
+# Sub-family distributions across different sources of _pir_ \s.
 
-## Sub-family distributions across the **numbers** of _pir_\s from different **species**.
+## Sub-family distributions across the **numbers** of _pir_ \s from different **species**.
 
 When generating the BLAST similarity network I included _pir_\s from other closely related species as well as the Sal1, P01 and W1 _P. vivax_ reference genomes. This heatmap shows the proportion of the total _pir_\s  for each species/vivax genome that belong to each sub-family. 
 
