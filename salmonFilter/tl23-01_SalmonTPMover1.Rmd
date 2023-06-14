@@ -625,11 +625,10 @@ Asexual stages show that better assemblies demonstrate better _de novo pir_ reco
 # write_csv(arrange(assembly_stats.df, expt), 
 #           path = 'assembly_stats.csv')
 
+# Manually altered the assembly_stats csv file to include life cycle stages and experimental identifiers.
 assembly_stats.df <- read_csv('assembly_stats_lifecycle.csv') %>% 
   mutate(helpful_id = paste0(experiment_id, '_', helpful_assembly_name),
          country = str_extract(location, pattern = '(?<=_).+(?=_)'))
-
-# Manually altered the assembly_stats csv file to include life cycle stages and experimental identifiers.
 
 lapply(c('mosquito','asexual'), function(stages){
   ggplot(data = filter(assembly_stats.df, str_detect(lifecycle_stage, 
@@ -955,6 +954,27 @@ subfam_ht <- Heatmap(t(assigned_subfam_prop.mat)[sort(colnames(assigned_subfam_p
 
 # Expression heatmaps of the _de novo_ _pir_\s, split by sub-family, across the samples in each assembly.
 
+```{r sample_names}
+# Get the sample file names (csv files, but without -proc as this was used for interrupted NF pipelines)
+csv.files <- grep(list.files('../../files_csv', 
+           pattern = 'vvx.+csv', 
+           full.names = TRUE),
+     pattern = '-proc', invert = TRUE, value = TRUE)
+
+#Produces NAs for Bourgard which didn't give any pirs so no biggie
+samples.df <- lapply(csv.files, read.csv) %>% 
+  bind_rows %>% 
+  unique %>% 
+  group_by(sample) %>% 
+  mutate(sample = paste0(sample, '_T', seq_along(sample)),
+         id = str_extract(fastq_1, pattern = '(?<=(Imperial_vivax_data_copy/|/nfFetchNGS_dir(|_redownload)/fastq/)).+(?=_(trimmed_paired|SRR|ERR))'))
+
+sample_names.df <- read_csv('../../files_csv/sample-info.csv') 
+
+sample_helpful_names.df <- inner_join(samples.df,sample_names.df,by = 'id')
+
+```
+
 These are still pretty messy, and I have yet to add informative sample names (the columns of the heatmap). Maybe the bar charts (that I did last time) would look better for this purpose? Or additional?
 
 Each heatmap represents the samples used for one assembly, and shows the TPM values of _de novo pir_\s in each sample aligned to their assembly, separated by the sub-family they're from. 
@@ -962,13 +982,15 @@ Each heatmap represents the samples used for one assembly, and shows the TPM val
 To reduce the sizes of the heatmaps to informative levels I used a further threshold, only including _pir_\s with a maximum TPM in one sample of at least 20 TPM.
 
 ```{r expression, show.fig = TRUE}
-quant_subfam.df <- left_join(quant.df, 
+quant_subfam.df <- inner_join(
+  left_join(quant.df, 
            select(assigned_subfam.df, c('label', 'Name', 'hmmer_path', "TPM_med", "TPM_max", "TPM_min", "NumReads_med", "NumReads_max", 
                                         "NumReads_min", "I1.4", "new_subfam", "num_pir", "num_transcripts", 
                                         "expt", "Input_file", "Dataset", "Complete", "Single", "Duplicated", 
                                         "Fragmented", "Missing", "n_markers", "lifecycle_stage", "location", 
                                         "experiment_id", "new_subfam_uniq", "assembly_id")),
-           by = c('Name', 'hmmer_path'))
+           by = c('Name', 'hmmer_path')),
+  sample_helpful_names.df, by = 'sample')
 
 quant_subfam_buscoFifty.df <- filter(quant_subfam.df,
                                      Complete >=50)
@@ -981,7 +1003,7 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id), function(expt.id){
   lapply(unique(expt.df$assembly_id), function(assm.id){
     assm.df <- expt.df[expt.df$assembly_id == assm.id,] %>% filter(TPM_max >= tpm_max_filter)
     if(nrow(assm.df) == 0) {return(NULL)}
-    tpm.df <- reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med ~ sample, value.var = 'TPM') %>% 
+    tpm.df <- reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med ~ helpful_sample_name, value.var = 'TPM') %>% 
       arrange(desc(TPM_med)) %>% 
       #Use factors here to order by the largest TPM_median sub-families.
       mutate(new_subfam_uniq = factor(new_subfam_uniq, levels = unique(new_subfam_uniq))) %>% 
@@ -1014,7 +1036,6 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id), function(expt.id){
 })
 ```
 
-```{r ancestral}
-
-```
-
+TODO:
+* Get ordering of heatmaps right.
+* Add cell cycle markers/gametocyte/ookinete markers to the expression.
