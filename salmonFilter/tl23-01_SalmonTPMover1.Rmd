@@ -983,7 +983,7 @@ To reduce the sizes of the heatmaps to informative levels I used a further thres
 
 ```{r expression, show.fig = TRUE}
 quant_subfam.df <- inner_join(
-  left_join(quant.df, 
+  left_join(quant_filtered.df, 
            select(assigned_subfam.df, c('label', 'Name', 'hmmer_path', "TPM_med", "TPM_max", "TPM_min", "NumReads_med", "NumReads_max", 
                                         "NumReads_min", "I1.4", "new_subfam", "num_pir", "num_transcripts", 
                                         "expt", "Input_file", "Dataset", "Complete", "Single", "Duplicated", 
@@ -996,21 +996,26 @@ quant_subfam_buscoFifty.df <- filter(quant_subfam.df,
                                      Complete >=50)
 
 #Filter the transcripts by max TPM to make results more manageable
-tpm_max_filter <- 0
+tpm_max_filter <- 3
 
 lapply(unique(quant_subfam_buscoFifty.df$experiment_id), function(expt.id){
   expt.df <- quant_subfam_buscoFifty.df[quant_subfam_buscoFifty.df$experiment_id == expt.id,]
   lapply(unique(expt.df$assembly_id), function(assm.id){
     assm.df <- expt.df[expt.df$assembly_id == assm.id,] %>% filter(TPM_max >= tpm_max_filter)
     if(nrow(assm.df) == 0) {return(NULL)}
+    # reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med ~ sample + helpful_sample_name, value.var = 'TPM') 
     tpm.df <- reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med ~ helpful_sample_name, value.var = 'TPM') %>% 
       arrange(desc(TPM_med)) %>% 
       #Use factors here to order by the largest TPM_median sub-families.
       mutate(new_subfam_uniq = factor(new_subfam_uniq, levels = unique(new_subfam_uniq))) %>% 
       arrange(new_subfam_uniq, desc(TPM_med)) %>% 
       tibble::column_to_rownames(var = 'label')
+    
     tpm.mat <- as.matrix(select(tpm.df, -new_subfam_uniq, -TPM_med))
     subfam.mat <- as.matrix(select(tpm.df, new_subfam_uniq))
+    
+    ordering_vector <- c('before','after','1h', '6h','12h','18h','22h','24h','26h','30h','36h','42h','48h','7d')
+    tpm.mat <- tpm.mat[,ordering(colnames(tpm.mat), order_vector = ordering_vector), drop = FALSE]
     
     #Ancestral gene name only
     rownames(tpm.mat) <- ifelse(rownames(tpm.mat) %in% ancestral_genes_denovo,
@@ -1025,7 +1030,9 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id), function(expt.id){
                   row_title_rot = 0,
                   show_row_names = TRUE,
                   name = 'TPM',
-                  column_title = assm.id) 
+                  column_title = assm.id,
+                  col = circlize::colorRamp2(c(0,max(tpm.mat)/2,max(tpm.mat)),
+                                   c('white',viridis::viridis(2)))) 
           # + Heatmap(subfam.mat, 
           #                                                  show_row_names = FALSE,
           #                                                  column_names_gp = gpar(fontsize = 7),
@@ -1037,5 +1044,6 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id), function(expt.id){
 ```
 
 TODO:
-* Get ordering of heatmaps right.
+* ~Get ordering of heatmaps right.~
+* There's something wrong with the colour scale of the heatmaps, can be seen when changing filter.
 * Add cell cycle markers/gametocyte/ookinete markers to the expression.
