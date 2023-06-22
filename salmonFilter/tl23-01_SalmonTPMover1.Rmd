@@ -1066,7 +1066,7 @@ quant_subfam_buscoFifty.df <- filter(quant_subfam.df,
                                      Complete >=50)
 
 #Filter the transcripts by max TPM to make results more manageable
-tpm_max_filter <- 3
+# tpm_max_filter <- 3
 ordering_vector <- c('before','after','1h', '6h','12h','18h','22h','24h','26h','30h','36h','42h','48h','7d')
 
 lapply(unique(quant_subfam_buscoFifty.df$experiment_id), 
@@ -1074,7 +1074,9 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id),
          expt.df <- quant_subfam_buscoFifty.df[quant_subfam_buscoFifty.df$experiment_id == expt.id,]
          lapply(unique(expt.df$assembly_id), 
                 function(assm.id){
-                  assm.df <- expt.df[expt.df$assembly_id == assm.id,] %>% filter(TPM_max >= tpm_max_filter)
+                  assm.df <- expt.df[expt.df$assembly_id == assm.id,] 
+                  tpm_max_filter <- max(assm.df$TPM)/10
+                  assm.df <-  filter(assm.df, TPM_max >= tpm_max_filter)
                   if(nrow(assm.df) == 0) {return(NULL)}
                   # reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med ~ sample + helpful_sample_name, value.var = 'TPM') 
                   tpm.df <- reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med + id99_ref ~ helpful_sample_name, 
