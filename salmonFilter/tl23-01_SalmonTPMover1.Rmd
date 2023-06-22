@@ -625,19 +625,36 @@ write_csv(edges.df,
 
 ```{r blast_99pid}
 
-filter(blast_filt_dedup.df, 
+# Find the genes which are extremely closely related to other genes. Note when these are from the reference genomes.
+
+# `(send - sstart - mismatch + 1)/slen >= .99` is to calculate scovhsp, although I don't know if this calculation is entirely correct and may not include gaps. qcovhsp is oddly poorly defined.
+
+blast99 <- filter(blast_filt_dedup.df, 
        pident >= 99, 
        qcovhsp >= 99, 
-       (send - sstart)/slen >= .99,
-       str_detect(qseqid , pattern = 'Nonam') | str_detect(sseqid , pattern = 'Nonam')) %>% 
-  group_by(sseqid) %>% 
-  summarise(gene_ident = paste(qseqid, collapse = ', ')) %>% 
-  arrange(desc(sseqid) )
+       (send - sstart- mismatch + 1)/slen >= .99) %>% 
+  select(qseqid, sseqid)
 
-group_by(blast_filt_dedup.df, sseqid) %>%  
-       known_pir_id = ifelse(pident >= 99 & qcovhsp >= 99 & (send - sstart)/slen >= .99
+blast99.df <- bind_rows(blast99, rename(blast99, qseqid = sseqid, sseqid = qseqid)) %>% 
+  group_by(qseqid) %>% 
+  summarise(id99_ref = paste(sseqid[str_detect(sseqid, pattern = 'PVX|PVP01|PVW1')], collapse = ','),
+            id99_nonref = paste(sseqid[str_detect(sseqid, pattern = 'PVX|PVP01|PVW1', negate = TRUE)], collapse = ',')) 
+
+blast99_denovo.df <- mutate(blast99.df,
+         Name = str_extract(qseqid, pattern = "NonamEV.+t[[:digit:]]{1,2}(?=_)"),
+         assembly = str_extract(qseqid, pattern = "(?<=t[[:digit:]]{1,2}_).+")) %>%
+  filter(!is.na(Name)) %>% 
+  select(Name, assembly, id99_ref, id99_nonref)
+
+# select(blast_filt_dedup.df, pident, qcovhsp, qend, qstart, length, gapopen, mismatch) %>% 
+#   mutate(pidentt =  100*(qend - qstart - mismatch + 1)/length,
+#          pidenttt = 100*(length - mismatch)/length,
+#          qcovhspp = 100*(qend - qstart - mismatch - gapopen + 1)/length)
 
 ```
+
+Interesting that some pirs have 99% matches with other pirs from same expt but different datasets e.g.:
+* NonamEVm000405t1_Meul22_PNG056_vvx matches NonamEVm003070t2_Meul22_Pv024_vvx.
 
 # Assembly statistics
 
@@ -1019,7 +1036,11 @@ samples.df <- lapply(csv.files, read.csv) %>%
 
 sample_names.df <- read_csv('../../files_csv/sample-info.csv') 
 
-sample_helpful_names.df <- inner_join(samples.df,sample_names.df,by = 'id')
+#Some sample name are not unique for each assembly
+sample_helpful_names.df <- inner_join(samples.df,sample_names.df,by = 'id') %>% 
+  mutate(samplename = str_split_fixed(sample, pattern = '_vvx', n =2)[1]) %>% 
+  group_by(samplename) %>% 
+  mutate(helpful_sample_name = uniquify(helpful_sample_name))
 
 ```
 
@@ -1030,65 +1051,69 @@ Each heatmap represents the samples used for one assembly, and shows the TPM val
 To reduce the sizes of the heatmaps to informative levels I used a further threshold, only including _pir_\s with a maximum TPM in one sample of at least 20 TPM.
 
 ```{r expression, show.fig = TRUE}
-quant_subfam.df <- inner_join(
-  left_join(quant_filtered.df, 
-           select(assigned_subfam.df, c('label', 'Name', 'hmmer_path', "TPM_med", "TPM_max", "TPM_min", "NumReads_med", "NumReads_max", 
-                                        "NumReads_min", "I1.4", "new_subfam", "num_pir", "num_transcripts", 
-                                        "expt", "Input_file", "Dataset", "Complete", "Single", "Duplicated", 
-                                        "Fragmented", "Missing", "n_markers", "lifecycle_stage", "location", 
-                                        "experiment_id", "new_subfam_uniq", "assembly_id")),
-           by = c('Name', 'hmmer_path')),
-  sample_helpful_names.df, by = 'sample')
+quant_subfam.df <- left_join(quant_filtered.df, 
+                             select(assigned_subfam.df, 
+                                    c('label', 'Name', 'hmmer_path', "TPM_med", "TPM_max", "TPM_min", "NumReads_med", "NumReads_max", 
+                                      "NumReads_min", "I1.4", "new_subfam", "num_pir", "num_transcripts", 
+                                      "expt", "Input_file", "Dataset", "Complete", "Single", "Duplicated", 
+                                      "Fragmented", "Missing", "n_markers", "lifecycle_stage", "location", 
+                                      "experiment_id", "new_subfam_uniq", "assembly_id")),
+                             by = c('Name', 'hmmer_path')) %>% 
+  inner_join(sample_helpful_names.df, by = 'sample') %>% 
+  left_join(blast99_denovo.df, by = c('Name', 'assembly'))
 
 quant_subfam_buscoFifty.df <- filter(quant_subfam.df,
                                      Complete >=50)
 
 #Filter the transcripts by max TPM to make results more manageable
 tpm_max_filter <- 3
+ordering_vector <- c('before','after','1h', '6h','12h','18h','22h','24h','26h','30h','36h','42h','48h','7d')
 
-lapply(unique(quant_subfam_buscoFifty.df$experiment_id), function(expt.id){
-  expt.df <- quant_subfam_buscoFifty.df[quant_subfam_buscoFifty.df$experiment_id == expt.id,]
-  lapply(unique(expt.df$assembly_id), function(assm.id){
-    assm.df <- expt.df[expt.df$assembly_id == assm.id,] %>% filter(TPM_max >= tpm_max_filter)
-    if(nrow(assm.df) == 0) {return(NULL)}
-    # reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med ~ sample + helpful_sample_name, value.var = 'TPM') 
-    tpm.df <- reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med ~ helpful_sample_name, value.var = 'TPM') %>% 
-      arrange(desc(TPM_med)) %>% 
-      #Use factors here to order by the largest TPM_median sub-families.
-      mutate(new_subfam_uniq = factor(new_subfam_uniq, levels = unique(new_subfam_uniq))) %>% 
-      arrange(new_subfam_uniq, desc(TPM_med)) %>% 
-      tibble::column_to_rownames(var = 'label')
-    
-    tpm.mat <- as.matrix(select(tpm.df, -new_subfam_uniq, -TPM_med))
-    subfam.mat <- as.matrix(select(tpm.df, new_subfam_uniq))
-    
-    ordering_vector <- c('before','after','1h', '6h','12h','18h','22h','24h','26h','30h','36h','42h','48h','7d')
-    tpm.mat <- tpm.mat[,ordering(colnames(tpm.mat), order_vector = ordering_vector), drop = FALSE]
-    
-    #Ancestral gene name only
-    rownames(tpm.mat) <- ifelse(rownames(tpm.mat) %in% ancestral_genes_denovo,
-                                'anc',
-                                '')
-    
-    draw( Heatmap(tpm.mat, 
-                  cluster_rows = FALSE, 
-                  cluster_columns = FALSE,
-                  column_names_gp = gpar(fontsize = 7),
-                  row_split = factor(c(subfam.mat), levels = unique(subfam.mat)),
-                  row_title_rot = 0,
-                  show_row_names = TRUE,
-                  name = 'TPM',
-                  column_title = assm.id,
-                  col = circlize::colorRamp2(c(0,max(tpm.mat)/2,max(tpm.mat)),
-                                   c('white',viridis::viridis(2)))) 
-          # + Heatmap(subfam.mat, 
-          #                                                  show_row_names = FALSE,
-          #                                                  column_names_gp = gpar(fontsize = 7),
-          #                          name = 'sub-family') 
-    )
-    return()
-  })
-})
+lapply(unique(quant_subfam_buscoFifty.df$experiment_id), 
+       function(expt.id){
+         expt.df <- quant_subfam_buscoFifty.df[quant_subfam_buscoFifty.df$experiment_id == expt.id,]
+         lapply(unique(expt.df$assembly_id), 
+                function(assm.id){
+                  assm.df <- expt.df[expt.df$assembly_id == assm.id,] %>% filter(TPM_max >= tpm_max_filter)
+                  if(nrow(assm.df) == 0) {return(NULL)}
+                  # reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med ~ sample + helpful_sample_name, value.var = 'TPM') 
+                  tpm.df <- reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med + id99_ref ~ helpful_sample_name, 
+                                            value.var = 'TPM') %>% 
+                    arrange(desc(TPM_med)) %>% 
+                    #Use factors here to order by the largest TPM_median sub-families.
+                    mutate(new_subfam_uniq = factor(new_subfam_uniq, levels = unique(new_subfam_uniq)),
+                           rownames = ifelse(label %in% ancestral_genes_denovo, 'anc', 
+                                             ifelse(str_detect(id99_ref, pattern = 'P'), id99_ref, NA ))) %>% 
+                    arrange(new_subfam_uniq, desc(TPM_med))
+                  
+                  tpm.mat <- as.matrix(select(tpm.df, -new_subfam_uniq, -TPM_med, -id99_ref, -rownames, -label))
+                  subfam.mat <- as.matrix(select(tpm.df, new_subfam_uniq))
+                  
+                  rownames(tpm.mat) <- ifelse(is.na(tpm.df$rownames), '', tpm.df$rownames)
+                  
+                  tpm.mat <- tpm.mat[,ordering(colnames(tpm.mat), order_vector = ordering_vector), drop = FALSE]
+                  
+                  #Ancestral gene name only
+                  
+                  draw( Heatmap(tpm.mat, 
+                                cluster_rows = FALSE, 
+                                cluster_columns = FALSE,
+                                column_names_gp = gpar(fontsize = 7),
+                                row_split = factor(c(subfam.mat), levels = unique(subfam.mat)),
+                                row_title_rot = 0,
+                                show_row_names = TRUE,
+                                name = 'TPM',
+                                column_title = assm.id,
+                                col = circlize::colorRamp2(c(0,max(tpm.mat)/2,max(tpm.mat)),
+                                                           c('white',viridis::viridis(2)))) 
+                        # + Heatmap(subfam.mat, 
+                        #                                                  show_row_names = FALSE,
+                        #                                                  column_names_gp = gpar(fontsize = 7),
+                        #                          name = 'sub-family') 
+                  )
+                  return()
+                })
+       })
 ```
 
 TODO:
