@@ -1,0 +1,186 @@
+---
+title: "tl23-01_HeatmapsExpressionPerSample"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, 
+                      results = FALSE, 
+                      message = FALSE, 
+                      warning = FALSE,
+                      fig.show = FALSE)
+# Default hide output in knitr
+options(scipen = 999) 
+# Means that numbers are displayed normally not as 1e6 (1000000)
+```
+
+```{r loading_packages, include = FALSE, message = FALSE}
+# Load the required packages
+library('readr')
+library('dplyr')
+library('stringr')
+library('purrr')
+library('kableExtra')
+# library('plotly')
+library('rmarkdown')
+library('seqinr')
+library('ggplot2')
+library('ComplexHeatmap')
+
+safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
+                             "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888")
+global_save_var <- FALSE
+```
+
+```{r function_ordering}
+ordering <- function(to_order, order_vector, fromLast = TRUE){
+  order = unlist(sapply(order_vector, 
+                        function(x){unique(str_subset(to_order, 
+                                                      pattern = paste(x)))}))
+  order_missing = unique(to_order[!to_order %in% order])
+  unique(c(order, order_missing), fromLast = fromLast)
+}
+```
+
+```{r function_uniquify}
+#Make unique identifiers from a vector of names by appending '_X' where X is the number of the 'replicate'.
+uniquify <- function(vector_names, first_one = TRUE){
+  new_vector <- c()
+  df_num <- data.frame(names = unique(vector_names), rep = 1)
+  if(first_one){
+    duplicated_names <- unique(vector_names[duplicated(vector_names)])
+  }else{
+    duplicated_names <- c()
+  }
+  for(i in 1:length(vector_names)){
+    if(vector_names[i] %in% duplicated_names|!first_one){
+      name <- paste(vector_names[i],
+                    df_num$rep[match(vector_names[i], df_num$names)],
+                    sep = '_')
+      #Increase rep counter
+      df_num$rep[match(vector_names[i], df_num$names)] <- df_num$rep[match(vector_names[i], df_num$names)] + 1
+      new_vector[i] <- name
+    }else{
+      new_vector[i] <- vector_names[i]
+    }
+  }
+  new_vector
+}
+```
+
+```{r import_data}
+
+quant_filtered.df <- read.csv('salmonQuant_filtered.csv')
+
+assigned_subfam.df <- read_csv('pirLabel_newSubfam.csv')
+
+ancestral_genes_denovo <- as.character(read.table('ancestralGenes_denovo.txt', 
+                                                  stringsAsFactors = FALSE)$x)
+
+blast99_denovo.df <- read_csv('denovoPir_blast99matches.csv')
+
+```
+
+
+# Expression heatmaps of the _de novo_ _pir_\s, split by sub-family, across the samples in each assembly.
+
+```{r sample_names}
+# Get the sample file names (csv files, but without -proc as this was used for interrupted NF pipelines)
+csv.files <- grep(list.files('../../files_csv', 
+           pattern = 'vvx.+csv', 
+           full.names = TRUE),
+     pattern = '-proc', invert = TRUE, value = TRUE)
+
+#Produces NAs for Bourgard which didn't give any pirs so no biggie
+samples.df <- lapply(csv.files, read.csv) %>% 
+  bind_rows %>% 
+  unique %>% 
+  group_by(sample) %>% 
+  mutate(sample = paste0(sample, '_T', seq_along(sample)),
+         id = str_extract(fastq_1, pattern = '(?<=(Imperial_vivax_data_copy/|/nfFetchNGS_dir(|_redownload)/fastq/)).+(?=_(trimmed_paired|SRR|ERR))'))
+
+sample_names.df <- read_csv('../../files_csv/sample-info.csv') 
+
+#Some sample name are not unique for each assembly
+sample_helpful_names.df <- inner_join(samples.df,sample_names.df,by = 'id') %>% 
+  mutate(samplename = str_split_fixed(sample, pattern = '_vvx', n =2)[1]) %>% 
+  group_by(samplename) %>% 
+  mutate(helpful_sample_name = uniquify(helpful_sample_name))
+
+```
+
+These are still pretty messy, and I have yet to add informative sample names (the columns of the heatmap). Maybe the bar charts (that I did last time) would look better for this purpose? Or additional?
+
+Each heatmap represents the samples used for one assembly, and shows the TPM values of _de novo pir_\s in each sample aligned to their assembly, separated by the sub-family they're from. 
+
+To reduce the sizes of the heatmaps to informative levels I used a further threshold, only including _pir_\s with a maximum TPM in one sample of at least 20 TPM.
+
+```{r expression, show.fig = TRUE}
+quant_subfam.df <- left_join(quant_filtered.df, 
+                             select(assigned_subfam.df, 
+                                    c('label', 'Name', 'hmmer_path', "TPM_med", "TPM_max", "TPM_min", "NumReads_med", "NumReads_max", 
+                                      "NumReads_min", "I1.4", "new_subfam", "num_pir", "num_transcripts", 
+                                      "expt", "Input_file", "Dataset", "Complete", "Single", "Duplicated", 
+                                      "Fragmented", "Missing", "n_markers", "lifecycle_stage", "location", 
+                                      "experiment_id", "new_subfam_uniq", "assembly_id")),
+                             by = c('Name', 'hmmer_path')) %>% 
+  inner_join(sample_helpful_names.df, by = 'sample') %>% 
+  left_join(blast99_denovo.df, by = c('Name', 'assembly'))
+
+quant_subfam_buscoFifty.df <- filter(quant_subfam.df,
+                                     Complete >=50)
+
+#Filter the transcripts by max TPM to make results more manageable
+# tpm_max_filter <- 3
+ordering_vector <- c('before','after','1h', '6h','12h','18h','22h','24h','26h','30h','36h','42h','48h','7d')
+
+lapply(unique(quant_subfam_buscoFifty.df$experiment_id), 
+       function(expt.id){
+         expt.df <- quant_subfam_buscoFifty.df[quant_subfam_buscoFifty.df$experiment_id == expt.id,]
+         lapply(unique(expt.df$assembly_id), 
+                function(assm.id){
+                  assm.df <- expt.df[expt.df$assembly_id == assm.id,] 
+                  tpm_max_filter <- max(assm.df$TPM)/10
+                  assm.df <-  filter(assm.df, TPM_max >= tpm_max_filter)
+                  if(nrow(assm.df) == 0) {return(NULL)}
+                  # reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med ~ sample + helpful_sample_name, value.var = 'TPM') 
+                  tpm.df <- reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med + id99_ref ~ helpful_sample_name, 
+                                            value.var = 'TPM') %>% 
+                    arrange(desc(TPM_med)) %>% 
+                    #Use factors here to order by the largest TPM_median sub-families.
+                    mutate(new_subfam_uniq = factor(new_subfam_uniq, levels = unique(new_subfam_uniq)),
+                           rownames = ifelse(label %in% ancestral_genes_denovo, 'anc', 
+                                             ifelse(str_detect(id99_ref, pattern = 'P'), id99_ref, NA ))) %>% 
+                    arrange(new_subfam_uniq, desc(TPM_med))
+                  
+                  tpm.mat <- as.matrix(select(tpm.df, -new_subfam_uniq, -TPM_med, -id99_ref, -rownames, -label))
+                  subfam.mat <- as.matrix(select(tpm.df, new_subfam_uniq))
+                  
+                  rownames(tpm.mat) <- ifelse(is.na(tpm.df$rownames), '', tpm.df$rownames)
+                  
+                  tpm.mat <- tpm.mat[,ordering(colnames(tpm.mat), order_vector = ordering_vector), drop = FALSE]
+                  
+                  #Ancestral gene name only
+                  
+                  draw( Heatmap(tpm.mat, 
+                                cluster_rows = FALSE, 
+                                cluster_columns = FALSE,
+                                column_names_gp = gpar(fontsize = 7),
+                                row_split = factor(c(subfam.mat), levels = unique(subfam.mat)),
+                                row_title_rot = 0,
+                                show_row_names = TRUE,
+                                name = 'TPM',
+                                column_title = assm.id,
+                                border = TRUE,
+                                row_names_gp = gpar(fontsize = 5),
+                                col = circlize::colorRamp2(c(0,max(tpm.mat)/2,max(tpm.mat)),
+                                                           c('white',viridis::viridis(2)))) 
+                        # + Heatmap(subfam.mat, 
+                        #                                                  show_row_names = FALSE,
+                        #                                                  column_names_gp = gpar(fontsize = 7),
+                        #                          name = 'sub-family') 
+                  )
+                  return()
+                })
+       })
+```
