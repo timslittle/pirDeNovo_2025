@@ -167,6 +167,14 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id),
                                                    !is.na(Description.y) ~ Description.y)) %>% 
                        arrange(new_subfam_uniq, desc(TPM_med))
                      
+                     #Only show the relevant 'ref' genes for comparison
+                     if(grepl(expt.id, pattern = 'Mosq')){
+                       tpm.df <- filter(tpm.df, 
+                                        new_subfam_uniq != 'ref' | grepl(rownames, 
+                                                                         ignore.case = TRUE, 
+                                                                         pattern = 'Gam|Ook'))
+                     }
+                     
                      tpm_pir.index <- tpm.df$new_subfam_uniq != 'ref'
                      tpm_ref.index <- tpm.df$new_subfam_uniq == 'ref'
                      
@@ -230,3 +238,21 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id),
                    })
        })
 ```
+
+By 26h are we seeing gametocytes that have escaped the inactivation?
+
+Notes:
+"""
+Julia Cai, Dina 03/08/2021 - Vivax data
+What days pi? Carriers, blood extracted, mosquit o blood feeding, 1h, 6h, 18-22-26h, 7d. Six infections. Heavy oocyst infections among mosquitoes in 2 of the isolates, mid in one, low in three. Only RNAseq’d the three higher infections.
+Q: Did they use the blood bolus? Whole midgut? Yes whole midgut.
+
+Had heat-inactivated blood of vivax infections as a control. 
+Q: Does this just inactivate the gametocytes? Maybe not, all parasites are inactivated maybe. Not lysed though, so still alive, just can’t progress to gametogenesis.
+
+% reads aligned to vivax is low (<3%) over the first few timepoints and gets lower with time (until peak of around 15% at oocysts).
+
+Vivax in An. darlingi in Iquitos, Peru. (Marta Moreno in Peru, Laboratorio ICEMR-Amazonia).
+
+Julia has reanalysed the raw data.
+"""
