@@ -141,63 +141,92 @@ ordering_vector <- c('before','after','1h', '6h','12h','18h','22h','24h','26h','
 
 lapply(unique(quant_subfam_buscoFifty.df$experiment_id), 
        function(expt.id){
+         
+         # print(expt.id)
          expt.df <- quant_subfam_buscoFifty.df[quant_subfam_buscoFifty.df$experiment_id == expt.id,]
-         lapply(unique(expt.df$assembly_id), 
-                function(assm.id){
-                  assm.df <- expt.df[expt.df$assembly_id == assm.id,] 
-                  tpm_pir_max_filter <- round(max(assm.df$TPM[!is.na(assm.df$E.value_fullseq)])/10)
-                  #Filter by max_TPM but include na values (as these are the non-pir reference genes).
-                  assm.df <-  filter(assm.df, TPM_max >= tpm_pir_max_filter | is.na(TPM_max))
-                  if(nrow(assm.df) == 0) {return(NULL)}
-                  # reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med ~ sample + helpful_sample_name, value.var = 'TPM') 
-                  tpm.df <- reshape2::dcast(assm.df, 
-                                            Name + label + new_subfam_uniq + TPM_med + id99_ref + Description.y ~ helpful_sample_name, 
-                                            value.var = 'TPM') %>% 
-                    arrange(desc(TPM_med)) %>% 
-                    #Use factors here to order by the largest TPM_median sub-families.
-                    mutate(new_subfam_uniq = factor(new_subfam_uniq, levels = unique(new_subfam_uniq)),
-                           rownames = case_when(label %in% ancestral_genes_denovo ~ 'anc',
-                                                str_detect(id99_ref, pattern = 'P') ~ id99_ref,
-                                                !is.na(Description.y) ~ Description.y)) %>% 
-                    arrange(new_subfam_uniq, desc(TPM_med))
-                  
-                  tpm.mat <- as.matrix(select(tpm.df, -Name, -new_subfam_uniq, -TPM_med, -id99_ref, -rownames, -label, -Description.y))
-                  subfam.mat <- as.matrix(select(tpm.df, new_subfam_uniq))
-                  
-                  rownames(tpm.mat) <- ifelse(is.na(tpm.df$rownames), '', tpm.df$rownames)
-                  
-                  tpm.mat <- tpm.mat[,ordering(colnames(tpm.mat), order_vector = ordering_vector), drop = FALSE]
-                  
-                  #Ancestral gene name only
-                  
-                  draw( Heatmap(tpm.mat, 
-                                cluster_rows = FALSE, 
-                                cluster_columns = FALSE,
-                                column_names_gp = gpar(fontsize = 7),
-                                row_split = factor(c(subfam.mat), levels = unique(subfam.mat)),
-                                row_title_rot = 0,
-                                show_row_names = TRUE,
-                                name = 'TPM',
-                                column_title = assm.id,
-                                border = TRUE,
-                                row_names_gp = gpar(fontsize = 5),
-                                col = circlize::colorRamp2(round(c(0, 
-                                                                   tpm_pir_max_filter*5,
-                                                                   tpm_pir_max_filter*10,
-                                                                   tpm_pir_max_filter*20,
-                                                                   # max(tpm.mat)/2,
-                                                                   ifelse(max(tpm.mat) < 5*tpm_pir_max_filter,
-                                                                          tpm_pir_max_filter*30,
-                                                                          max(tpm.mat)))),
-                                                           c('white',
-                                                             viridis::viridis(3), 
-                                                             'yellow'))) 
-                        # + Heatmap(subfam.mat, 
-                        #                                                  show_row_names = FALSE,
-                        #                                                  column_names_gp = gpar(fontsize = 7),
-                        #                          name = 'sub-family') 
-                  )
-                  return()
-                })
+         # Go to next loop if there are no pirs
+         if(all(is.na(expt.df$E.value_fullseq))) {return()}
+            
+            lapply(unique(expt.df$assembly_id), 
+                   function(assm.id){
+                     # print(assm.id)
+                     assm.df <- expt.df[expt.df$assembly_id == assm.id,] 
+                     tpm_pir_max_filter <- round(max(assm.df$TPM[!is.na(assm.df$E.value_fullseq)])/10)
+                     #Filter by max_TPM but include na values (as these are the non-pir reference genes).
+                     assm.df <-  filter(assm.df, TPM_max >= tpm_pir_max_filter | is.na(TPM_max))
+                     if(nrow(assm.df) == 0) {return(NULL)}
+                     # reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med ~ sample + helpful_sample_name, value.var = 'TPM') 
+                     tpm.df <- reshape2::dcast(assm.df, 
+                                               Name + label + new_subfam_uniq + TPM_med + id99_ref + Description.y ~ helpful_sample_name, 
+                                               value.var = 'TPM') %>% 
+                       arrange(desc(TPM_med)) %>% 
+                       #Use factors here to order by the largest TPM_median sub-families.
+                       mutate(new_subfam_uniq = factor(new_subfam_uniq, levels = unique(new_subfam_uniq)),
+                              rownames = case_when(label %in% ancestral_genes_denovo ~ 'anc',
+                                                   str_detect(id99_ref, pattern = 'P') ~ id99_ref,
+                                                   !is.na(Description.y) ~ Description.y)) %>% 
+                       arrange(new_subfam_uniq, desc(TPM_med))
+                     
+                     tpm_pir.index <- tpm.df$new_subfam_uniq != 'ref'
+                     tpm_ref.index <- tpm.df$new_subfam_uniq == 'ref'
+                     
+                     tpm.mat <- as.matrix(select(tpm.df, -Name, -new_subfam_uniq, -TPM_med, -id99_ref, -rownames, -label, -Description.y))
+                     rownames(tpm.mat) <- ifelse(is.na(tpm.df$rownames), '', tpm.df$rownames)
+                     tpm.mat <- tpm.mat[,ordering(colnames(tpm.mat), order_vector = ordering_vector), drop = FALSE]
+                     
+                     tpm_pir.mat <- tpm.mat[tpm_pir.index,]
+                     tpm_ref.mat <- tpm.mat[tpm_ref.index,]
+                     
+                     subfam.mat <- as.matrix(select(tpm.df, new_subfam_uniq))[tpm_pir.index,]
+                     
+                     tmp_pir.max <- plyr::round_any(max(tpm_pir.mat), 10, f = ceiling)
+                     pir.ht <- Heatmap(tpm_pir.mat, 
+                                       cluster_rows = FALSE, 
+                                       cluster_columns = FALSE,
+                                       column_names_gp = gpar(fontsize = 7),
+                                       row_split = factor(c(subfam.mat), levels = unique(subfam.mat)),
+                                       row_title_rot = 0,
+                                       show_row_names = TRUE,
+                                       name = 'TPM',
+                                       column_title = assm.id,
+                                       border = TRUE,
+                                       row_names_gp = gpar(fontsize = 5),
+                                       col = circlize::colorRamp2(c(0, 
+                                                                    tmp_pir.max/4,
+                                                                    tmp_pir.max/2,
+                                                                    tmp_pir.max*3/4,
+                                                                    tmp_pir.max),
+                                                                  c('white',
+                                                                    viridis::viridis(4)))
+                     )
+                     
+                     if(length(tpm_ref.mat) >= 1){
+                       tmp_ref.max <- plyr::round_any(max(tpm_ref.mat), 100, f = ceiling)
+                       ref.ht <- Heatmap(tpm_ref.mat, 
+                                         cluster_rows = FALSE, 
+                                         cluster_columns = FALSE,
+                                         column_names_gp = gpar(fontsize = 7),
+                                         row_title_rot = 0,
+                                         show_row_names = TRUE,
+                                         show_heatmap_legend = TRUE,
+                                         name = 'TPM reference genes',
+                                         column_title = assm.id,
+                                         border = TRUE,
+                                         row_names_gp = gpar(fontsize = 5),
+                                         col = circlize::colorRamp2(c(0, 
+                                                                      tmp_ref.max/4,
+                                                                      tmp_ref.max/2,
+                                                                      tmp_ref.max*3/4,
+                                                                      tmp_ref.max),
+                                                                    c('white',
+                                                                      viridis::magma(4)))
+                       )
+                       return(pir.ht %v% ref.ht)
+                     } else {
+                       return(pir.ht)
+                     }
+                     
+                     return()
+                   })
        })
 ```
