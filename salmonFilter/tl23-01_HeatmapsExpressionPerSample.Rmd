@@ -116,16 +116,21 @@ Each heatmap represents the samples used for one assembly, and shows the TPM val
 To reduce the sizes of the heatmaps to informative levels I used a further threshold, only including _pir_\s with a maximum TPM in one sample of at least 20 TPM.
 
 ```{r expression, show.fig = TRUE}
+#Combine the relevant data, note that for the non-pir genes included for the heatmaps many of these will be NA.
 quant_subfam.df <- left_join(quant_filtered.df, 
                              select(assigned_subfam.df, 
                                     c('label', 'Name', 'hmmer_path', "TPM_med", "TPM_max", "TPM_min", "NumReads_med", "NumReads_max", 
-                                      "NumReads_min", "I1.4", "new_subfam", "num_pir", "num_transcripts", 
-                                      "expt", "Input_file", "Dataset", "Complete", "Single", "Duplicated", 
-                                      "Fragmented", "Missing", "n_markers", "lifecycle_stage", "location", 
-                                      "experiment_id", "new_subfam_uniq", "assembly_id")),
+                                      "NumReads_min", "I1.4", "new_subfam", "new_subfam_uniq"
+                                      # "expt", "Input_file", "Dataset", "Complete", "Single", "Duplicated",  "num_pir", "num_transcripts",
+                                      # "Fragmented", "Missing", "n_markers", "lifecycle_stage", "location", 
+                                      # "experiment_id", "new_subfam_uniq", "assembly_id"
+                                    )),
                              by = c('Name', 'hmmer_path')) %>% 
-  inner_join(sample_helpful_names.df, by = 'sample') %>% 
+  left_join(unique(select(assigned_subfam.df, 'hmmer_path', "assembly_id")), by = c('hmmer_path')) %>% 
+  inner_join(sample_helpful_names.df, by = 'sample') %>%
   left_join(blast99_denovo.df, by = c('Name', 'assembly'))
+
+quant_subfam.df$new_subfam_uniq[is.na(quant_subfam.df$new_subfam_uniq)] <- 'ref'
 
 quant_subfam_buscoFifty.df <- filter(quant_subfam.df,
                                      Complete >=50)
@@ -141,19 +146,22 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id),
                 function(assm.id){
                   assm.df <- expt.df[expt.df$assembly_id == assm.id,] 
                   tpm_max_filter <- max(assm.df$TPM)/10
-                  assm.df <-  filter(assm.df, TPM_max >= tpm_max_filter)
+                  #Filter by max_TPM but include na values (as these are the non-pir reference genes).
+                  assm.df <-  filter(assm.df, TPM_max >= tpm_max_filter | is.na(TPM_max))
                   if(nrow(assm.df) == 0) {return(NULL)}
                   # reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med ~ sample + helpful_sample_name, value.var = 'TPM') 
-                  tpm.df <- reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med + id99_ref ~ helpful_sample_name, 
+                  tpm.df <- reshape2::dcast(assm.df, 
+                                            Name + label + new_subfam_uniq + TPM_med + id99_ref + Description.y ~ helpful_sample_name, 
                                             value.var = 'TPM') %>% 
                     arrange(desc(TPM_med)) %>% 
                     #Use factors here to order by the largest TPM_median sub-families.
                     mutate(new_subfam_uniq = factor(new_subfam_uniq, levels = unique(new_subfam_uniq)),
-                           rownames = ifelse(label %in% ancestral_genes_denovo, 'anc', 
-                                             ifelse(str_detect(id99_ref, pattern = 'P'), id99_ref, NA ))) %>% 
+                           rownames = case_when(label %in% ancestral_genes_denovo ~ 'anc',
+                                                str_detect(id99_ref, pattern = 'P') ~ id99_ref,
+                                                !is.na(Description.y) ~ Description.y)) %>% 
                     arrange(new_subfam_uniq, desc(TPM_med))
                   
-                  tpm.mat <- as.matrix(select(tpm.df, -new_subfam_uniq, -TPM_med, -id99_ref, -rownames, -label))
+                  tpm.mat <- as.matrix(select(tpm.df, -Name, -new_subfam_uniq, -TPM_med, -id99_ref, -rownames, -label, -Description.y))
                   subfam.mat <- as.matrix(select(tpm.df, new_subfam_uniq))
                   
                   rownames(tpm.mat) <- ifelse(is.na(tpm.df$rownames), '', tpm.df$rownames)
@@ -173,7 +181,7 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id),
                                 column_title = assm.id,
                                 border = TRUE,
                                 row_names_gp = gpar(fontsize = 5),
-                                col = circlize::colorRamp2(c(0,max(tpm.mat)/2,max(tpm.mat)),
+                                col = circlize::colorRamp2(round(c(0,max(tpm.mat)/2,max(tpm.mat))),
                                                            c('white',viridis::viridis(2)))) 
                         # + Heatmap(subfam.mat, 
                         #                                                  show_row_names = FALSE,

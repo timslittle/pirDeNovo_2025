@@ -144,6 +144,7 @@ quant.files <- c(
 assemblies.list <- str_extract(quant.files, pattern = '(?<=_vvx_T[[:digit:]]{1,2}_).+(?=/quant.sf)') %>% unique
 
 # Load in the quant.sf data by lapply-ing across the experiment/Nextflow analysis names above.
+# 
 # quant.list <- lapply(assemblies.list,
 #                    function(assembly.nam){
 #                      print(paste0("Doing ", assembly.nam))
@@ -184,21 +185,21 @@ assemblies.list <- str_extract(quant.files, pattern = '(?<=_vvx_T[[:digit:]]{1,2
 #                                                  "score_bestdom", "bias_bestdom", "exp_numdom", "N_numdom", "Sequence",
 #                                                  "Description", "Name"))
 #                      }
-#                      
+# 
 #                      #BUSCO results - once again have to take account of my silly file organisation and using different naming conventions.
-#                      
-#                      busco_assembly_name <- str_replace(str_replace(assembly.nam, 
-#                                                                     pattern = '-', 
+# 
+#                      busco_assembly_name <- str_replace(str_replace(assembly.nam,
+#                                                                     pattern = '-',
 #                                                                     replacement = '_'),
 #                                                         pattern = 'Kim19_Isolate',
 #                                                         replacement = 'Kim19_Isolate_')
-#                      
+# 
 #                      if(length(system(paste0("ls ../../nextflow/multiassembly_evigene_results/*/busco/*/",
 #                                              busco_assembly_name,
 #                                              '.okay.aa/run_plasmodium_odb10/full_table.tsv'), intern = TRUE)) > 0) {
 #                        busco.df <- read_tsv(system(paste0("ls ../../nextflow/multiassembly_evigene_results/*/busco/*/",
 #                                                           busco_assembly_name,
-#                                                           '.okay.aa/run_plasmodium_odb10/full_table.tsv'), 
+#                                                           '.okay.aa/run_plasmodium_odb10/full_table.tsv'),
 #                                                    intern = TRUE),
 #                                             skip = 2)
 #                      } else {
@@ -206,11 +207,11 @@ assemblies.list <- str_extract(quant.files, pattern = '(?<=_vvx_T[[:digit:]]{1,2
 #                                                           assembly.nam,
 #                                                           "*/",
 #                                                           assembly.nam,
-#                                                           ".okay.aa/run_plasmodium_odb10/full_table.tsv"), 
+#                                                           ".okay.aa/run_plasmodium_odb10/full_table.tsv"),
 #                                                    intern = TRUE), skip = 2)
 #                      }
-#                      
-#                      busco.df <- mutate(busco.df, Name = Sequence) %>% 
+# 
+#                      busco.df <- mutate(busco.df, Name = Sequence) %>%
 #                          mutate(across(everything(), as.character))
 # 
 #                      # Get the quant files for this assembly
@@ -237,20 +238,47 @@ assemblies.list <- str_extract(quant.files, pattern = '(?<=_vvx_T[[:digit:]]{1,2
 #                      }) %>%
 #                        bind_rows %>%
 #                        # Combine with the HMMer and BUSCO
-#                        left_join(hmmer_gz.df, by = 'Name') %>% 
+#                        left_join(hmmer_gz.df, by = 'Name') %>%
 #                        left_join(busco.df, by = 'Name')
-#                      }) 
+#                      })
 # 
 # # data.table::rbindlist(quant.list)
 # 
 # quant.df <- bind_rows(quant.list)
 # 
-# quant.df <- mutate(quant.df, hmm_cvrg_perc = (hmm_cvrg/380)*100)
-
+# quant.df <- mutate(quant.df, hmm_cvrg_perc = (hmm_cvrg/380)*100) %>%
+#   group_by(assembly,fasta_path) %>%
+#   mutate(num_transcripts = system(paste0('grep ">" ',fasta_path,'| wc -l'), intern = TRUE),
+#          expt = str_extract(assembly, pattern = '^.+(?=_.+_vvx)'))
+# 
+# assembly_busco <- lapply(unique(quant.df$hmmer_path),
+#        function(hmmer.path){
+#          res.path = str_extract(hmmer.path, pattern = '.+vvx_.+(?=/hmmer)')
+#          assembly.nam = unique(quant.df$assembly[quant.df$hmmer_path == hmmer.path])
+#          busco.df = read.table(paste0(res.path,
+#                                       '/busco/',
+#                                       assembly.nam,
+#                                       '-plasmodium_odb10-busco.batch_summary.txt'),
+#                                header = TRUE) %>%
+#            mutate(assembly = assembly.nam)
+#        }) %>% bind_rows %>% arrange(Complete)
+# 
+# # Manually altered the assembly_stats csv file to include life cycle stages and experimental identifiers.
+# assembly_stats.df <- read_csv('assembly_stats_lifecycle.csv') %>% 
+#   mutate(helpful_id = paste0(experiment_id, '_', helpful_assembly_name),
+#          country = str_extract(location, pattern = '(?<=_).+(?=_)')) %>% 
+#   select(assembly, num_pir, lifecycle_stage, location, experiment_id, helpful_assembly_name, helpful_id, country)
+# 
+# quant.df <- full_join(full_join(quant.df, assembly_busco, by = 'assembly'), assembly_stats.df, by = 'assembly')
+# 
 # write_csv(quant.df, path = 'salmonQuant_all.csv')
 
 #read_csv is faster but may populate an entire column with NA. ?readr::cols
 quant.df <- read.csv(file = 'salmonQuant_all.csv')
+
+```
+
+```{r assembly_stats}
 
 #QC: Which sample names are NA:
 # filter(quant.df, is.na(sample)) %>% .$source %>% unique
@@ -264,12 +292,12 @@ quant.df <- read.csv(file = 'salmonQuant_all.csv')
 ```{r quant_filtered}
 # Grouping by each assembly and transcript, which transcripts have TPM and NumReads < 1 TPM in every sample.
 # #. i.e. Filter out every transcript with at least one sample with >= 1 TPM/NumReads.
-quant_filtered.df <- group_by(quant.df,
-                              assembly,
-                              fasta_path,
-                              Name) %>%
-  filter(any(TPM >= 1 & NumReads >= 1)) %>%
-  filter(!is.na(hmm_cvrg) & hmm_cvrg_perc >= 75 | Description.y %in% 'Male gamete fusion factor HAP2, putative')
+# quant_filtered.df <- group_by(quant.df,
+#                               assembly,
+#                               fasta_path,
+#                               Name) %>%
+#   filter(any(TPM >= 1 & NumReads >= 1)) %>%
+#   filter(!is.na(hmm_cvrg) & hmm_cvrg_perc >= 75 | Description.y %in% 'Male gamete fusion factor HAP2, putative')
 # write_csv(quant_filtered.df, path = 'salmonQuant_filtered.csv')
 
 quant_filtered.df <- read.csv('salmonQuant_filtered.csv')
@@ -294,6 +322,7 @@ mutate(quant_stats.df,expt = str_extract(assembly, pattern = '^[[:alpha:]]+[[:di
   group_by(expt) %>% summarise(num_pir_filt = sum(num_pir_filt)) %>% arrange(num_pir_filt) 
 # %>% .$num_pir_filt %>% sum()
 sum(quant_stats.df$num_pir_filt)
+filter(quant_filtered.df, X..Busco.id == '3673at5820')
 ```
 
 # Histogram of HMM % coverage across the _de novo pir_\s
@@ -669,35 +698,6 @@ Mosquito stages show low-to-no _de novo pir_\s even with decent BUSCO results, w
 Asexual stages show that better assemblies demonstrate better _de novo pir_ recoveries. There is no plateau of the _pir_ numbers, demonstrating that these assemblies are only capturing a subset of the total _pir_ transcriptome, as expected. Note that one SchzMixd22 (from Papua New Guinea) sample shows exceptional _de novo pir_ numbers (373) despite low BUSCO score.
 
 ```{r assembly_stats}
-# assembly_numTranscript <- quant_sequence.df %>% 
-#   group_by(assembly,fasta_path) %>% 
-#   # Use the same metrics as before to count the number of pirs, using *_max now.
-#   summarise(num_pir = n_distinct(Name[TPM_max >= 1 & NumReads_max >= 1 & !is.na(hmm_cvrg) & hmm_cvrg_perc >= 75])) %>% 
-#   arrange(desc(num_pir), assembly) %>% 
-#   mutate(num_transcripts = system(paste0('grep ">" ',fasta_path,'| wc -l'), intern = TRUE),
-#          expt = str_extract(assembly, pattern = '^.+(?=_.+_vvx)'))
-# 
-# assembly_busco <- lapply(unique(quant_sequence.df$hmmer_path), 
-#        function(hmmer.path){
-#          res.path = str_extract(hmmer.path, pattern = '.+vvx_.+(?=/hmmer)')
-#          assembly.nam = unique(quant_sequence.df$assembly[quant_sequence.df$hmmer_path == hmmer.path])
-#          busco.df = read.table(paste0(res.path,
-#                                       '/busco/',
-#                                       assembly.nam,
-#                                       '-plasmodium_odb10-busco.batch_summary.txt'),
-#                                header = TRUE) %>% 
-#            mutate(assembly = assembly.nam)
-#        }) %>% bind_rows %>% arrange(Complete)
-# 
-# assembly_stats.df <- full_join(assembly_numTranscript, assembly_busco, by = 'assembly') %>% arrange(desc(num_pir))
-# 
-# write_csv(arrange(assembly_stats.df, expt), 
-#           path = 'assembly_stats.csv')
-
-# Manually altered the assembly_stats csv file to include life cycle stages and experimental identifiers.
-assembly_stats.df <- read_csv('assembly_stats_lifecycle.csv') %>% 
-  mutate(helpful_id = paste0(experiment_id, '_', helpful_assembly_name),
-         country = str_extract(location, pattern = '(?<=_).+(?=_)'))
 
 lapply(c('mosquito','asexual'), function(stages){
   ggplot(data = filter(assembly_stats.df, str_detect(lifecycle_stage, 
@@ -733,8 +733,8 @@ assembly_stats.df[assembly_stats.df$Complete <= 50,] %>% arrange(num_pir)
 #   mutate(new_subfam = ifelse(sum(str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$')) > 5,
 #                              names(which.max(table(factor(str_subset(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$'))))),
 #                              'new')) %>% 
-#   #Combine with the assembly_stats
-#   left_join(assembly_stats.df)
+# #Combine with the assembly_stats
+# left_join(assembly_stats.df)
 # #which.max code finds the most frequent members, table does the enumerating.
 # 
 # #Get unique names for each sub-family.
