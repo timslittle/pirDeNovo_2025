@@ -145,9 +145,9 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id),
          lapply(unique(expt.df$assembly_id), 
                 function(assm.id){
                   assm.df <- expt.df[expt.df$assembly_id == assm.id,] 
-                  tpm_max_filter <- max(assm.df$TPM)/10
+                  tpm_pir_max_filter <- round(max(assm.df$TPM[!is.na(assm.df$E.value_fullseq)])/10)
                   #Filter by max_TPM but include na values (as these are the non-pir reference genes).
-                  assm.df <-  filter(assm.df, TPM_max >= tpm_max_filter | is.na(TPM_max))
+                  assm.df <-  filter(assm.df, TPM_max >= tpm_pir_max_filter | is.na(TPM_max))
                   if(nrow(assm.df) == 0) {return(NULL)}
                   # reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med ~ sample + helpful_sample_name, value.var = 'TPM') 
                   tpm.df <- reshape2::dcast(assm.df, 
@@ -181,8 +181,17 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id),
                                 column_title = assm.id,
                                 border = TRUE,
                                 row_names_gp = gpar(fontsize = 5),
-                                col = circlize::colorRamp2(round(c(0,max(tpm.mat)/2,max(tpm.mat))),
-                                                           c('white',viridis::viridis(2)))) 
+                                col = circlize::colorRamp2(round(c(0, 
+                                                                   tpm_pir_max_filter*5,
+                                                                   tpm_pir_max_filter*10,
+                                                                   tpm_pir_max_filter*20,
+                                                                   # max(tpm.mat)/2,
+                                                                   ifelse(max(tpm.mat) < 5*tpm_pir_max_filter,
+                                                                          tpm_pir_max_filter*30,
+                                                                          max(tpm.mat)))),
+                                                           c('white',
+                                                             viridis::viridis(3), 
+                                                             'yellow'))) 
                         # + Heatmap(subfam.mat, 
                         #                                                  show_row_names = FALSE,
                         #                                                  column_names_gp = gpar(fontsize = 7),

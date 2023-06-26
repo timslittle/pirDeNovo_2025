@@ -275,6 +275,7 @@ assemblies.list <- str_extract(quant.files, pattern = '(?<=_vvx_T[[:digit:]]{1,2
 
 #read_csv is faster but may populate an entire column with NA. ?readr::cols
 quant.df <- read.csv(file = 'salmonQuant_all.csv')
+# quant.df <- read_csv(file = 'salmonQuant_all.csv', col_types = cols(.default = col_character()))
 
 ```
 
@@ -290,14 +291,34 @@ quant.df <- read.csv(file = 'salmonQuant_all.csv')
 ```
 
 ```{r quant_filtered}
+#Want to include some non-pir genes as identified by BUSCO since these are useful for comparing different life cycle stages present.
+comp_busco_genes <- c('Secreted ookinete protein, putative',
+                      'Secreted ookinete adhesive protein, putative',
+                      '25 kDa ookinete surface antigen, putative',
+                      '28 kDa ookinete surface protein',
+                      'Cell traversal protein for ookinetes and sporozoites',
+                      
+                      'Male gamete fusion factor HAP2, putative',
+                      'Gamete egress and sporozoite traversal protein, putative',
+                      'Gamete release protein, putative',
+                      
+                      'Glyceraldehyde-3-phosphate dehydrogenase',
+                      'Tubulin beta chain',
+                      'Fructose-bisphosphate aldolase',
+                      
+                      'Chloroquine resistance transporter'
+                      )
+
+# For Pvivax housekeeping gene: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4704153/
+
 # Grouping by each assembly and transcript, which transcripts have TPM and NumReads < 1 TPM in every sample.
 # #. i.e. Filter out every transcript with at least one sample with >= 1 TPM/NumReads.
-# quant_filtered.df <- group_by(quant.df,
-#                               assembly,
-#                               fasta_path,
-#                               Name) %>%
-#   filter(any(TPM >= 1 & NumReads >= 1)) %>%
-#   filter(!is.na(hmm_cvrg) & hmm_cvrg_perc >= 75 | Description.y %in% 'Male gamete fusion factor HAP2, putative')
+quant_filtered.df <- group_by(quant.df,
+                              assembly,
+                              fasta_path,
+                              Name) %>%
+  filter(any(TPM >= 1 & NumReads >= 1)) %>%
+  filter(!is.na(hmm_cvrg) & hmm_cvrg_perc >= 75 | Description.y %in% comp_busco_genes)
 # write_csv(quant_filtered.df, path = 'salmonQuant_filtered.csv')
 
 quant_filtered.df <- read.csv('salmonQuant_filtered.csv')
