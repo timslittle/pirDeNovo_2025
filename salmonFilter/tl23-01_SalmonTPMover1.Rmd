@@ -262,19 +262,19 @@ assemblies.list <- str_extract(quant.files, pattern = '(?<=_vvx_T[[:digit:]]{1,2
 #                                header = TRUE) %>%
 #            mutate(assembly = assembly.nam)
 #        }) %>% bind_rows %>% arrange(Complete)
-# 
-# # Manually altered the assembly_stats csv file to include life cycle stages and experimental identifiers.
-# assembly_stats.df <- read_csv('assembly_stats_lifecycle.csv') %>% 
-#   mutate(helpful_id = paste0(experiment_id, '_', helpful_assembly_name),
-#          country = str_extract(location, pattern = '(?<=_).+(?=_)')) %>% 
-#   select(assembly, num_pir, lifecycle_stage, location, experiment_id, helpful_assembly_name, helpful_id, country)
-# 
+
+# Manually altered the assembly_stats csv file to include life cycle stages and experimental identifiers.
+assembly_stats.df <- read_csv('assembly_stats_lifecycle.csv') %>%
+  mutate(helpful_id = paste0(experiment_id, '_', helpful_assembly_name),
+         country = str_extract(location, pattern = '(?<=_).+(?=_)')) %>%
+  select(assembly, num_pir, lifecycle_stage, location, experiment_id, helpful_assembly_name, helpful_id, country)
+
 # quant.df <- full_join(full_join(quant.df, assembly_busco, by = 'assembly'), assembly_stats.df, by = 'assembly')
 # 
 # write_csv(quant.df, path = 'salmonQuant_all.csv')
 
 #read_csv is faster but may populate an entire column with NA. ?readr::cols
-quant.df <- read.csv(file = 'salmonQuant_all.csv')
+# quant.df <- read.csv(file = 'salmonQuant_all.csv')
 # quant.df <- read_csv(file = 'salmonQuant_all.csv', col_types = cols(.default = col_character()))
 
 ```
@@ -316,37 +316,37 @@ comp_busco_genes <- c('Secreted ookinete protein, putative',
 
 # Grouping by each assembly and transcript, which transcripts have TPM and NumReads < 1 TPM in every sample.
 # #. i.e. Filter out every transcript with at least one sample with >= 1 TPM/NumReads.
-quant_filtered.df <- group_by(quant.df,
-                              assembly,
-                              fasta_path,
-                              Name) %>%
-  filter(any(TPM >= 1 & NumReads >= 1)) %>%
-  filter(!is.na(hmm_cvrg) & hmm_cvrg_perc >= 75 | Description.y %in% comp_busco_genes)
+# quant_filtered.df <- group_by(quant.df,
+#                               assembly,
+#                               fasta_path,
+#                               Name) %>%
+#   filter(any(TPM >= 1 & NumReads >= 1)) %>%
+#   filter(!is.na(hmm_cvrg) & hmm_cvrg_perc >= 75 | Description.y %in% comp_busco_genes)
 # write_csv(quant_filtered.df, path = 'salmonQuant_filtered.csv')
 
 quant_filtered.df <- read.csv('salmonQuant_filtered.csv')
 
-'HMM Plasmodium_vir coverage for each sequence' <- na.omit(quant.df$hmm_cvrg_perc)
-hist(`HMM Plasmodium_vir coverage for each sequence`, breaks = 1000, cex.main = 1)
-hist(quant_filtered.df$hmm_cvrg_perc, breaks = 100)
+# 'HMM Plasmodium_vir coverage for each sequence' <- na.omit(quant.df$hmm_cvrg_perc)
+# hist(`HMM Plasmodium_vir coverage for each sequence`, breaks = 1000, cex.main = 1)
+# hist(quant_filtered.df$hmm_cvrg_perc, breaks = 100)
 
 # quant_filtered.df %>% filter(TPM < 1)
 
 # How many genes/pir genes are kept for each assembly
-( quant_stats.df <- group_by(quant.df, assembly) %>% 
-    summarise(prop_all = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1])/n_distinct(Name),
-              num_pir = n_distinct(Name[!is.na(Sequence.x)]),
-              prop_pir_tpm = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1 & !is.na(Sequence.x)])/n_distinct(Name[!is.na(Sequence.x)]),
-              prop_pir_hmm = 100*n_distinct(Name[hmm_cvrg_perc >= 75 & !is.na(Sequence.x)])/n_distinct(Name[!is.na(Sequence.x)]),
-              prop_pir_filt = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1 & !is.na(Sequence.x) & hmm_cvrg_perc >= 75])/n_distinct(Name[!is.na(Sequence.x)]),
-              num_pir_filt = n_distinct(Name[TPM >= 1 & NumReads >= 1 & !is.na(Sequence.x) & hmm_cvrg_perc >= 75])) %>% 
-    arrange(prop_pir_filt) )
-arrange(quant_stats.df, assembly)
-mutate(quant_stats.df,expt = str_extract(assembly, pattern = '^[[:alpha:]]+[[:digit:]]{2}(?=_)')) %>% 
-  group_by(expt) %>% summarise(num_pir_filt = sum(num_pir_filt)) %>% arrange(num_pir_filt) 
-# %>% .$num_pir_filt %>% sum()
-sum(quant_stats.df$num_pir_filt)
-filter(quant_filtered.df, X..Busco.id == '3673at5820')
+# ( quant_stats.df <- group_by(quant.df, assembly) %>% 
+#     summarise(prop_all = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1])/n_distinct(Name),
+#               num_pir = n_distinct(Name[!is.na(Sequence.x)]),
+#               prop_pir_tpm = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1 & !is.na(Sequence.x)])/n_distinct(Name[!is.na(Sequence.x)]),
+#               prop_pir_hmm = 100*n_distinct(Name[hmm_cvrg_perc >= 75 & !is.na(Sequence.x)])/n_distinct(Name[!is.na(Sequence.x)]),
+#               prop_pir_filt = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1 & !is.na(Sequence.x) & hmm_cvrg_perc >= 75])/n_distinct(Name[!is.na(Sequence.x)]),
+#               num_pir_filt = n_distinct(Name[TPM >= 1 & NumReads >= 1 & !is.na(Sequence.x) & hmm_cvrg_perc >= 75])) %>% 
+#     arrange(prop_pir_filt) )
+# arrange(quant_stats.df, assembly)
+# mutate(quant_stats.df,expt = str_extract(assembly, pattern = '^[[:alpha:]]+[[:digit:]]{2}(?=_)')) %>% 
+#   group_by(expt) %>% summarise(num_pir_filt = sum(num_pir_filt)) %>% arrange(num_pir_filt) 
+# # %>% .$num_pir_filt %>% sum()
+# sum(quant_stats.df$num_pir_filt)
+# filter(quant_filtered.df, X..Busco.id == '3673at5820')
 ```
 
 # Histogram of HMM % coverage across the _de novo pir_\s
@@ -355,7 +355,7 @@ Higher percentage indicates a greater coverage of the input HMM model across the
 
 ```{r show_hist, fig.show=TRUE}
 
-hist(`HMM Plasmodium_vir coverage for each sequence`, breaks = 1000, cex.main = 1)
+# hist(`HMM Plasmodium_vir coverage for each sequence`, breaks = 1000, cex.main = 1)
 
 ```
 
@@ -448,24 +448,24 @@ write_csv(subfam.df,
 #             NumReads_min = min(NumReads))
 # 
 # # Get the median TPM and NumReads for each assembly de novo pir
-# quant_filtered_sequence.df <-  mutate(quant_filtered.df, 
-#                                       Name_assembly = paste0(Name, '_', assembly)) %>% 
-#   # Grouping over all variables except those that are sample specific (as opposed to assembly specific)
-#   group_by(pick(!matches(c('source|sample|file_source|TPM|NumReads|EffectiveLength')))) %>% 
-#   summarise(TPM_med = median(TPM),
-#             TPM_max = max(TPM),
-#             TPM_min = min(TPM),
-#             NumReads_med = median(NumReads),
-#             NumReads_max = max(NumReads),
-#             NumReads_min = min(NumReads))
+quant_filtered_sequence.df <-  mutate(quant_filtered.df,
+                                      Name_assembly = paste0(Name, '_', assembly)) %>%
+  # Grouping over all variables except those that are sample specific (as opposed to assembly specific)
+  group_by(pick(!matches(c('source|sample|file_source|TPM|NumReads|EffectiveLength')))) %>%
+  summarise(TPM_med = median(TPM),
+            TPM_max = max(TPM),
+            TPM_min = min(TPM),
+            NumReads_med = median(NumReads),
+            NumReads_max = max(NumReads),
+            NumReads_min = min(NumReads))
 
-gephi.df <- mutate(subfam.df, 
+gephi.df <- mutate(subfam.df,
                    Id = seq_along(Name),
                    label = Name,
                    subfam = subfam,
-                   Name_assembly = Name) %>% 
-  select(-Name) %>% 
-  left_join(quant_filtered_sequence.df, by = c('Name_assembly')) %>% 
+                   Name_assembly = Name) %>%
+  select(-Name) %>%
+  left_join(quant_filtered_sequence.df, by = c('Name_assembly')) %>%
   relocate(Id, label)
 
 #Prev issue: Why are a load of Meul22_Pv032 pirs in subfam.df but not quant_filtered_sequence.df.
@@ -723,8 +723,12 @@ Asexual stages show that better assemblies demonstrate better _de novo pir_ reco
 
 ```{r assembly_stats}
 
+assembly.df <- unique(select(quant_filtered.df, 
+                                     lifecycle_stage, Complete, num_pir, experiment_id))
+
 lapply(c('mosquito','asexual'), function(stages){
-  ggplot(data = filter(assembly_stats.df, str_detect(lifecycle_stage, 
+  ggplot(data = filter(assembly.df,
+                              str_detect(lifecycle_stage, 
                                                      pattern = stages)) , 
          aes(x = Complete, 
              y = num_pir, 
@@ -742,9 +746,9 @@ lapply(c('mosquito','asexual'), function(stages){
           legend.key.size = unit(.5,"cm"))
 })
 
-assembly_stats.df[assembly_stats.df$Complete > 50,] %>% arrange(num_pir)
-assemblies_overFiftyBUSCO <- assembly_stats.df$assembly[assembly_stats.df$Complete > 50]
-assembly_stats.df[assembly_stats.df$Complete <= 50,] %>% arrange(num_pir)
+assembly.df[assembly.df$Complete > 50,] %>% arrange(num_pir)
+assemblies_overFiftyBUSCO <- assembly.df$assembly[assembly.df$Complete > 50]
+assembly.df[assembly.df$Complete <= 50,] %>% arrange(num_pir)
 
 ```
 
@@ -1000,7 +1004,7 @@ tpm_ht <- Heatmap(t(assigned_subfam_tpm_prop.mat)[sort(colnames(assigned_subfam_
 draw(tpm_ht + busco_ht + country_ht)
 ```
 
-```{r}
+```{r country}
 assigned_subfam_num.df <- assigned_subfam.df %>% 
   filter(assembly == 'Meul22_PNG056_vvx' | Complete >= 50) %>% 
   group_by(country) %>% 
@@ -1043,7 +1047,7 @@ subfam_ht <- Heatmap(t(assigned_subfam_prop.mat)[sort(colnames(assigned_subfam_p
                                      max(assigned_subfam_prop.mat)),
                                    c('white',viridis::viridis(3))))
 
-# draw(subfam_ht)
+draw(subfam_ht)
 
 #From limited data perhaps PNG (Both the de novo and the P01) is depleted for the largest sub-families (Es).
 
