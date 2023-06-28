@@ -172,7 +172,7 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id),
                        tpm.df <- filter(tpm.df, 
                                         new_subfam_uniq != 'ref' | grepl(rownames, 
                                                                          ignore.case = TRUE, 
-                                                                         pattern = 'Gam|Ook'))
+                                                                         pattern = 'Gam|Ook|Ooc|Malate|Ribonucleoside-diphosphate'))
                      }
                      
                      tpm_pir.index <- tpm.df$new_subfam_uniq != 'ref'
@@ -194,8 +194,9 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id),
                                        column_names_gp = gpar(fontsize = 7),
                                        row_split = factor(c(subfam.mat), levels = unique(subfam.mat)),
                                        row_title_rot = 0,
+                                       row_title_gp = gpar(fontsize = 7),
                                        show_row_names = TRUE,
-                                       name = 'TPM',
+                                       name = 'TPM pir',
                                        column_title = assm.id,
                                        border = TRUE,
                                        row_names_gp = gpar(fontsize = 5),
@@ -217,7 +218,7 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id),
                                          row_title_rot = 0,
                                          show_row_names = TRUE,
                                          show_heatmap_legend = TRUE,
-                                         name = 'TPM reference genes',
+                                         name = 'TPM ref genes',
                                          column_title = assm.id,
                                          border = TRUE,
                                          row_names_gp = gpar(fontsize = 5),
@@ -240,6 +241,8 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id),
 ```
 
 By 26h are we seeing gametocytes that have escaped the inactivation?
+
+Some of the gametocyte markers appear quite high in 'asexual' samples.
 
 Notes:
 """
