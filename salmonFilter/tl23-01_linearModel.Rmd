@@ -1,0 +1,81 @@
+---
+title: "tl23-01_linearModel"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries}
+# Load the required packages
+library('readr')
+library('dplyr')
+library('stringr')
+library('purrr')
+library('kableExtra')
+# library('plotly')
+library('rmarkdown')
+library('seqinr')
+library('ggplot2')
+library('ComplexHeatmap')
+
+safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
+                             "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888")
+global_save_var <- FALSE
+```
+
+```{r read_data}
+assigned_subfam.df <- read_csv('pirLabel_newSubfam.csv')
+
+
+# Manually altered the assembly_stats csv file to include life cycle stages and experimental identifiers.
+assembly_stats.df <- read_csv('assembly_stats_lifecycle.csv') %>%
+  mutate(helpful_id = paste0(experiment_id, '_', helpful_assembly_name),
+         country = str_extract(location, pattern = '(?<=_).+(?=_)'),
+         assembly_id = paste0(experiment_id,'_',
+                              str_extract(assembly,
+                                          pattern = '(?<=_).+(?=_)'))) %>%
+  select(assembly_id, num_pir, lifecycle_stage, location, experiment_id, helpful_assembly_name, helpful_id, country)
+
+assembly_busco.df <- read_csv('busco_all.csv')
+```
+
+```{r}
+deNovo_assigned_subfam.df <- filter(assigned_subfam.df, 
+                                    subfam == 'de_novo')
+
+missing_assemblies <- unique(assembly_stats.df$assembly_id)[!unique(assembly_stats.df$assembly_id) %in% unique(deNovo_assigned_subfam.df$assembly_id)]
+
+missing_assemblies.df <- filter(assembly_stats.df, 
+                                assembly_id %in% missing_assemblies) %>% 
+  select(assembly_id, Complete, experiment_id, country, lifecycle_stage)
+
+#Fill in the missing values for those with zero of each sub-family
+#Add the missing values (i.e. the zero TPM values for missing sub-families)
+
+tpm_med.df <- group_by(deNovo_assigned_subfam.df, 
+                  assembly_id, 
+                  new_subfam_uniq,
+                  Complete,
+                  experiment_id,
+                  country,
+                  lifecycle_stage)  %>% 
+  summarise(TPM_med = sum(TPM_med)) %>% 
+  group_by(assembly_id) %>% 
+  mutate(prop_tpm = TPM_med/sum(TPM_med)) %>% 
+  select(-assembly_id, -TPM_med) 
+
+%>% 
+  ungroup %>% 
+  tidyr::complete(assembly_id, new_subfam_uniq, fill = list(prop_tpm = 0)) %>% 
+  arrange(assembly_id, Complete) %>% 
+  group_by(assembly_id) %>% 
+  # Fill in the NA values for these constant values across assemblies.
+  tidyr::fill(Complete, experiment_id, country, lifecycle_stage) %>% 
+  arrange(assembly_id)
+
+group_by(lm.df, assembly_id) %>% summarise(n_distinct(Complete))
+```
+
+

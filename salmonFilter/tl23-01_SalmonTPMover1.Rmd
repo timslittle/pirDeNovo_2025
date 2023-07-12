@@ -262,6 +262,7 @@ assemblies.list <- str_extract(quant.files, pattern = '(?<=_vvx_T[[:digit:]]{1,2
 #                                header = TRUE) %>%
 #            mutate(assembly = assembly.nam)
 #        }) %>% bind_rows %>% arrange(Complete)
+# write_csv(assembly_busco, path = 'busco_all.csv')
 
 # Manually altered the assembly_stats csv file to include life cycle stages and experimental identifiers.
 assembly_stats.df <- read_csv('assembly_stats_lifecycle.csv') %>%
@@ -1053,9 +1054,59 @@ draw(subfam_ht)
 
 ```
 
+```{r lm}
+colnames(assigned_subfam.df)
+assigned_subfam.df[is.na(assigned_subfam.df$experiment_id),]
+
+#Add the missing values (i.e. the zero TPM values for missing sub-families)
+subfam_prop_zero.df <- select(assigned_subfam.df, 
+       label,
+       assembly_id, 
+       new_subfam_uniq,
+       Complete,
+       experiment_id,
+       country,
+       TPM_med,
+       lifecycle_stage) %>% 
+  filter(!is.na(experiment_id)) %>% 
+  tidyr::complete(assembly_id, new_subfam_uniq, fill = list(TPM_med = 0)) %>% 
+  group_by(assembly_id) %>% 
+  arrange(Complete) %>% 
+  # Fill in the NA values for these constant values across assemblies.
+  tidyr::fill(Complete, experiment_id, country, lifecycle_stage)
+
+# filter(subfam_prop_zero.df, is.na(Complete))
+
+lm.df <- group_by(subfam_prop_zero.df, 
+                  assembly_id, 
+                  new_subfam_uniq,
+                  Complete,
+                  experiment_id,
+                  country,
+                  lifecycle_stage)  %>% 
+  summarise(TPM_med = sum(TPM_med)) %>% 
+  group_by(assembly_id) %>% 
+  mutate(prop_tpm = TPM_med/sum(TPM_med)) %>% 
+  select(-assembly_id, -TPM_med)
+
+leaps.m <- leaps::regsubsets(prop_tpm ~ ., lm.df, method = "forward")
+summary(leaps.m)
+
+prop_tpm.lm <- lm(prop_tpm ~ 0 + new_subfam_uniq*country*lifecycle_stage + Complete + experiment_id, 
+                  data = lm.df)
+summary(prop_tpm.lm)
+prop_tpm.coef <- coef(summary(prop_tpm.lm)) 
+prop_tpm.coef[prop_tpm.coef[,"Pr(>|t|)"] < .05,]
+arrange(as.data.frame(prop_tpm.coef[prop_tpm.coef[,"Pr(>|t|)"] < .05,], desc('Pr(>|t|)')))
+```
+
 TODO:
 * ~Get ordering of heatmaps right.~
-* There's something wrong with the colour scale of the heatmaps, can be seen when changing filter.
-* Add cell cycle markers/gametocyte/ookinete markers to the expression. - Use BUSCO results from full_table.tsv.
+* There's something wrong with the colour scale of the heatmaps, can be seen when changing filter. - to do with max values?
+* What is the prop_TPM calculated from? The sum of medians? Why didn't I use the sum of all samples instead of sum of medians?
+** If including BUSCO and stages in the linear model I need all the zero values too.
+** Prop for each sample may make more sense for the linear model estimation too.
+* ~Add cell cycle markers/gametocyte/ookinete markers to the expression. - Use BUSCO results from full_table.tsv.~
+
 
 *Check that the BUSCO scores included haven't led to duplicated transcript names in case of same transcript matching two BUSCO.
