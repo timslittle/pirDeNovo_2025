@@ -19,6 +19,7 @@ library('rmarkdown')
 library('seqinr')
 library('ggplot2')
 library('ComplexHeatmap')
+library('leaps')
 
 safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
                              "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888")
@@ -79,9 +80,94 @@ lm.df <- tpm_med.df %>%
   # Fill in the NA values for these constant values across assemblies, arrange by Complete so that the filled-in values are used for fill.
   tidyr::fill(Complete, experiment_id, country, lifecycle_stage) %>% 
   arrange(assembly_id) %>% 
-  filter(!is.na(new_subfam_uniq))
+  #Remove the NA 'sub-family' from the NA values of the missing assemblies, and remove the liver/sporozoite/ook/ooc samples as these provide little extra information.
+  filter(!is.na(new_subfam_uniq), !str_detect(lifecycle_stage, pattern = 'liver|mosquito_sporozoite|mosquito_oo'))
 
 # group_by(lm.df, assembly_id) %>% summarise(n_distinct(new_subfam_uniq))
 ```
 
+```{r leaps}
+leaps.m <- regsubsets(prop_tpm ~ new_subfam_uniq + Complete + experiment_id + country + lifecycle_stage,
+                      lm.df, 
+                      method = "forward", 
+                      nvmax = 100)
+
+leaps.m <- regsubsets(prop_tpm ~ 0 + new_subfam_uniq*country*lifecycle_stage*experiment_id + Complete,
+                      lm.df, 
+                      # really.big=TRUE,
+                      method = "backward",
+                      nvmax = 100
+                      )
+leaps.sum <- summary(leaps.m)
+leaps.df <- as.data.frame(leaps.sum$outmat)
+leaps_topMod.df <- leaps.df[apply(leaps.df, 2, function(x) any(str_detect(x, pattern = '\\*')))]
+#Order by the number of "*" = the order of best explanatory variables of model
+leaps_topMod.df <- leaps_topMod.df[,order(apply(leaps_topMod.df, 2, function(x) sum(str_count(x, pattern = '\\*'))), decreasing = TRUE)]
+colnames(leaps_topMod.df)
+plot(leaps.m, scale = "adjr2")
+
+data.frame(
+  Adj.R2 = which.max(leaps.sum$adjr2),
+  CP = which.min(leaps.sum$cp),
+  BIC = which.min(leaps.sum$bic)
+)
+
+which.max(leaps.sum$adjr2)
+bestModel <- leaps.sum$which[which.max(leaps.sum$adjr2),]
+bestModel[bestModel]
+
+layout(matrix(1:2, ncol = 2))
+## Adjusted R2
+res.legend <-
+    car::subsets(leaps.m, statistic="adjr2", legend = FALSE, min.size = 1, main = "Adjusted R^2")
+## Mallow Cp
+res.legend <-
+    car::subsets(leaps.m, statistic="cp", legend = FALSE, min.size = 1, main = "Mallow Cp")
+abline(a = 1, b = 1, lty = 2)
+
+expression(prop_tpm ~ 0 + new_subfam_uniq*country*lifecycle_stage + assembly_id + experiment_id + Complete)
+
+lm.sum <- summary(lm(prop_tpm ~ 0 + new_subfam_uniq*country*lifecycle_stage + experiment_id + Complete,
+                      lm.df))
+as.data.frame(lm.sum$coefficients)[as.data.frame(lm.sum$coefficients)$`Pr(>|t|)` < 0.05,] %>% 
+  arrange(desc(`t value`)) %>% mutate(`Pr(>|t|)` = round(`Pr(>|t|)`, digits = 15))
+
+```
+
+```{r}
+
+# id: model id
+# object: regsubsets object
+# data: data used to fit regsubsets
+# outcome: outcome variable
+get_model_formula <- function(id, object, outcome){
+  # get models data
+  models <- summary(object)$which[id,-1]
+  # Get outcome variable
+  #form <- as.formula(object$call[[2]])
+  #outcome <- all.vars(form)[1]
+  # Get model predictors
+  predictors <- names(which(models == TRUE))
+  predictors <- paste(predictors, collapse = "+")
+  # Build model formula
+  as.formula(paste0(outcome, "~", predictors))
+}
+
+library('caret')
+get_cv_error <- function(model.formula, data){
+  set.seed(1)
+  train.control <- trainControl(method = "cv", number = 5)
+  cv <- train(model.formula, data = data, method = "lm",
+              trControl = train.control)
+  cv$results$RMSE
+}
+
+model.ids <- 1:75
+cv.vals <- map(model.ids, get_model_formula, leaps.m, "prop_tpm")%>%
+  map(get_cv_error, data = model.matrix(~ 0 + ., lm.df)) %>%
+  unlist()
+which.min(cv.vals)
+get_model_formula(which.min(cv.vals), leaps.m, "prop_tpm")
+
+```
 
