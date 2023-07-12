@@ -36,9 +36,11 @@ assembly_stats.df <- read_csv('assembly_stats_lifecycle.csv') %>%
          assembly_id = paste0(experiment_id,'_',
                               str_extract(assembly,
                                           pattern = '(?<=_).+(?=_)'))) %>%
-  select(assembly_id, num_pir, lifecycle_stage, location, experiment_id, helpful_assembly_name, helpful_id, country)
+  select(assembly, assembly_id, num_pir, lifecycle_stage, location, experiment_id, helpful_assembly_name, helpful_id, country)
 
 assembly_busco.df <- read_csv('busco_all.csv')
+
+assembly_stats_busco.df <- inner_join(assembly_stats.df, assembly_busco.df)
 ```
 
 ```{r}
@@ -47,7 +49,7 @@ deNovo_assigned_subfam.df <- filter(assigned_subfam.df,
 
 missing_assemblies <- unique(assembly_stats.df$assembly_id)[!unique(assembly_stats.df$assembly_id) %in% unique(deNovo_assigned_subfam.df$assembly_id)]
 
-missing_assemblies.df <- filter(assembly_stats.df, 
+missing_assemblies.df <- filter(assembly_stats_busco.df, 
                                 assembly_id %in% missing_assemblies) %>% 
   select(assembly_id, Complete, experiment_id, country, lifecycle_stage)
 
@@ -66,16 +68,20 @@ tpm_med.df <- group_by(deNovo_assigned_subfam.df,
   mutate(prop_tpm = TPM_med/sum(TPM_med)) %>% 
   select(-assembly_id, -TPM_med) 
 
-%>% 
+#Add assemblies completely missing due to zero pirs
+tpm_med.df <- bind_rows(missing_assemblies.df, tpm_med.df)
+
+lm.df <- tpm_med.df %>% 
   ungroup %>% 
   tidyr::complete(assembly_id, new_subfam_uniq, fill = list(prop_tpm = 0)) %>% 
   arrange(assembly_id, Complete) %>% 
   group_by(assembly_id) %>% 
-  # Fill in the NA values for these constant values across assemblies.
+  # Fill in the NA values for these constant values across assemblies, arrange by Complete so that the filled-in values are used for fill.
   tidyr::fill(Complete, experiment_id, country, lifecycle_stage) %>% 
-  arrange(assembly_id)
+  arrange(assembly_id) %>% 
+  filter(!is.na(new_subfam_uniq))
 
-group_by(lm.df, assembly_id) %>% summarise(n_distinct(Complete))
+# group_by(lm.df, assembly_id) %>% summarise(n_distinct(new_subfam_uniq))
 ```
 
 
