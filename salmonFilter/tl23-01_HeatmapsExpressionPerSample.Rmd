@@ -139,6 +139,10 @@ quant_subfam_buscoFifty.df <- filter(quant_subfam.df,
 # tpm_max_filter <- 3
 ordering_vector <- c('before','after','1h', '6h','12h','18h','22h','24h','26h','30h','36h','42h','48h','7d')
 
+#Remove the 'Control' samples from MosqPeru23 as they don't add much info.
+quant_subfam_buscoFifty.df <- filter(quant_subfam_buscoFifty.df,
+                                     !grepl(helpful_sample_name, pattern = 'ctrl'))
+
 lapply(unique(quant_subfam_buscoFifty.df$experiment_id), 
        function(expt.id){
          
