@@ -1044,6 +1044,41 @@ country_country_ht <- Heatmap(country.mat[country_order,],
 draw(tpm_country_ht + busco_country_ht + country_country_ht)
 ```
 
+```{r subfam_tpm_buscoOrder_heatmap}
+busco_order <- rev(names(busco.mat[sort(busco.mat, index.return = TRUE)$ix,]))
+
+tpm_busco_ht <- Heatmap(t(assigned_subfam_tpm_prop.mat)[busco_order,], 
+        na_col = 'white',
+        name = 'Prop TPM',
+        cluster_rows = FALSE,
+        # cluster_columns = FALSE,
+        row_names_gp = gpar(fontsize = 6),
+        column_names_gp = gpar(fontsize = 6),
+        # column_split = 4,
+        col = circlize::colorRamp2(c(0,0.0001,
+                                     max(assigned_subfam_tpm_prop.mat)/4,
+                                     max(assigned_subfam_tpm_prop.mat)),
+                                   c('white',viridis::viridis(3))))
+
+busco_busco_ht <- Heatmap(busco.mat[busco_order,],
+                    name = 'busco',
+                    cluster_rows = FALSE,
+                    cluster_columns = FALSE,
+                    show_column_names = FALSE,
+                    col = circlize::colorRamp2(c(min(busco.mat),
+                                                 (max(busco.mat) + min(busco.mat))/2,
+                                                 max(busco.mat)),
+                                               c(viridis::magma(3))))
+
+country_busco_ht <- Heatmap(country.mat[busco_order,],
+                      name = 'source',
+                      row_names_gp = gpar(fontsize = 6),
+                      column_names_gp = gpar(fontsize = 6),
+                      col = c('black', 'blue', 'yellow', 'red', 'grey', 'hotpink')[1:length(unique(country.mat))])
+
+draw(tpm_busco_ht + busco_busco_ht + country_busco_ht)
+```
+
 
 ```{r country}
 assigned_subfam_num.df <- assigned_subfam.df %>% 
