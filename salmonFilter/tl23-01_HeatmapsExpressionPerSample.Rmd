@@ -155,7 +155,10 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id),
                    function(assm.id){
                      # print(assm.id)
                      assm.df <- expt.df[expt.df$assembly_id == assm.id,] 
-                     tpm_pir_max_filter <- round(max(assm.df$TPM[!is.na(assm.df$E.value_fullseq)])/10)
+                     # Filter pirs by one tenth of max value, unless this is lower than one.
+                     tpm_pir_max_filter <- ifelse(max(assm.df$TPM[!is.na(assm.df$E.value_fullseq)]) > 10,
+                                                  round(max(assm.df$TPM[!is.na(assm.df$E.value_fullseq)])/10),
+                                                  1)
                      #Filter by max_TPM but include na values (as these are the non-pir reference genes).
                      assm.df <-  filter(assm.df, TPM_max >= tpm_pir_max_filter | is.na(TPM_max))
                      if(nrow(assm.df) == 0) {return(NULL)}
@@ -234,6 +237,10 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id),
                                                                     c('white',
                                                                       viridis::magma(4)))
                        )
+                       pdf(paste0('../../plots/vvx_TPMheatmap_', expt.id, '_', assm.id, '.pdf'),
+                           width = 7, height = 4)
+                       draw(pir.ht %v% ref.ht)
+                       dev.off()
                        return(pir.ht %v% ref.ht)
                      } else {
                        return(pir.ht)
