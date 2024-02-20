@@ -86,6 +86,61 @@ lm.df <- tpm_med.df %>%
 # group_by(lm.df, assembly_id) %>% summarise(n_distinct(new_subfam_uniq))
 ```
 
+```{r binomial}
+
+deNovo_assigned_subfam.df
+
+bin.df <- group_by(deNovo_assigned_subfam.df, 
+                  assembly_id, 
+                  new_subfam_uniq,
+                  Complete,
+                  experiment_id,
+                  country,
+                  lifecycle_stage)  %>% 
+  summarise(TPM_med = sum(TPM_med)) %>% 
+  group_by(assembly_id) %>% 
+  mutate(total_tpm = round(sum(TPM_med))) %>% 
+  mutate(TPM_med = round(TPM_med))
+
+# Fit the Poisson regression model
+poisson_model <- glm(TPM_med ~ new_subfam_uniq + country + Complete, 
+                     data = bin.df, 
+                     family = "poisson")
+# Summarize the model
+summary(poisson_model)
+
+plot(residuals(poisson_model) ~ fitted(poisson_model))
+qqnorm(residuals(poisson_model))
+qqline(residuals(poisson_model))
+exp(coef(poisson_model))
+
+poisson_model_interaction <- glm(TPM_med ~ new_subfam_uniq * country + Complete, 
+                     data = bin.df, 
+                     family = "poisson")
+summary(poisson_model_interaction)
+
+summary_table <- summary(poisson_model_interaction)
+
+summary.df <- data.frame(coef(summary_table))
+summary.df[,'Pr...z..'] <- round(summary.df[,'Pr...z..'], digits = 7)
+
+# View coefficients ordered by coefficient value
+(coefficients_ordered <- summary.df[rev(order(abs(summary.df$Estimate))),])
+
+# View coefficients ordered by p-value
+(p_values_ordered <- summary.df[order(summary.df$`Pr...z..`),])
+
+
+# Compare models using likelihood ratio test
+library(lmtest)
+lr_test <- lrtest(poisson_model, poisson_model_interaction)
+print(lr_test)
+
+interaction.plot(x = bin.df$country, trace.factor = bin.df$new_subfam_uniq, response = bin.df$TPM_med)
+
+```
+
+
 ```{r leaps}
 leaps.m <- regsubsets(prop_tpm ~ new_subfam_uniq + Complete + experiment_id + country + lifecycle_stage,
                       lm.df, 
