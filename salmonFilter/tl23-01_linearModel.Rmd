@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r libraries}
 # Load the required packages
 library('readr')
+library('MASS')
 library('dplyr')
 library('stringr')
 library('purrr')
@@ -20,6 +21,9 @@ library('seqinr')
 library('ggplot2')
 library('ComplexHeatmap')
 library('leaps')
+library('lmtest')
+
+select
 
 safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
                              "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888")
@@ -29,7 +33,6 @@ global_save_var <- FALSE
 ```{r read_data}
 assigned_subfam.df <- read_csv('pirLabel_newSubfam.csv')
 
-
 # Manually altered the assembly_stats csv file to include life cycle stages and experimental identifiers.
 assembly_stats.df <- read_csv('assembly_stats_lifecycle.csv') %>%
   mutate(helpful_id = paste0(experiment_id, '_', helpful_assembly_name),
@@ -37,7 +40,7 @@ assembly_stats.df <- read_csv('assembly_stats_lifecycle.csv') %>%
          assembly_id = paste0(experiment_id,'_',
                               str_extract(assembly,
                                           pattern = '(?<=_).+(?=_)'))) %>%
-  select(assembly, assembly_id, num_pir, lifecycle_stage, location, experiment_id, helpful_assembly_name, helpful_id, country)
+  dplyr::select(assembly, assembly_id, num_pir, lifecycle_stage, location, experiment_id, helpful_assembly_name, helpful_id, country)
 
 assembly_busco.df <- read_csv('busco_all.csv')
 
@@ -127,12 +130,15 @@ summary.df[,'Pr...z..'] <- round(summary.df[,'Pr...z..'], digits = 7)
 # View coefficients ordered by coefficient value
 (coefficients_ordered <- summary.df[rev(order(abs(summary.df$Estimate))),])
 
+coefficients_ordered[grepl(rownames(coefficients_ordered), 
+                           pattern = "country")  & coefficients_ordered$`Pr...z..` < 0.05,]
+
+
 # View coefficients ordered by p-value
 (p_values_ordered <- summary.df[order(summary.df$`Pr...z..`),])
 
 
 # Compare models using likelihood ratio test
-library(lmtest)
 lr_test <- lrtest(poisson_model, poisson_model_interaction)
 print(lr_test)
 
@@ -140,6 +146,47 @@ interaction.plot(x = bin.df$country, trace.factor = bin.df$new_subfam_uniq, resp
 
 ```
 
+```{r compare_models}
+
+poisson_lifecycle_model <- glm(TPM_med ~ new_subfam_uniq + country * lifecycle_stage + Complete, 
+                               data = bin.df, 
+                               family = "poisson")
+
+# Fit the negative binomial regression model
+negbin_model_interaction <- glm.nb(TPM_med ~ new_subfam_uniq * country + Complete, 
+                                   data = bin.df)
+negbin_lifecycle_model <- glm.nb(TPM_med ~ new_subfam_uniq * country * lifecycle_stage + Complete, 
+                                 data = bin.df)
+
+lr_test <- lrtest(poisson_model, poisson_model_interaction, poisson_lifecycle_model,
+                  negbin_model_interaction, negbin_lifecycle_model,
+                  lm(TPM_med ~ new_subfam_uniq * country * lifecycle_stage + Complete, 
+                                 data = bin.df))
+print(lr_test)
+
+anova(poisson_model, poisson_model_interaction, poisson_lifecycle_model,
+                  negbin_model_interaction, negbin_lifecycle_model)
+```
+
+```{r negbio}
+
+# Summarize the model
+summary(negbin_lifecycle_model)
+
+plot(residuals(negbin_lifecycle_model) ~ fitted(negbin_lifecycle_model))
+qqnorm(residuals(negbin_lifecycle_model))
+qqline(residuals(negbin_lifecycle_model))
+exp(coef(negbin_lifecycle_model))
+
+summary.df <- data.frame(coef(summary(negbin_lifecycle_model)))
+summary.df[,'Pr...z..'] <- round(summary.df[,'Pr...z..'], digits = 7)
+
+# View coefficients ordered by coefficient value
+coefficients_ordered <- summary.df[rev(order(abs(summary.df$Estimate))),]
+coefficients_ordered$padj <- p.adjust(coefficients_ordered$Pr...z..)
+# Significant p-values
+coefficients_ordered[coefficients_ordered$`Pr...z..` < 0.05,]
+```
 
 ```{r leaps}
 leaps.m <- regsubsets(prop_tpm ~ new_subfam_uniq + Complete + experiment_id + country + lifecycle_stage,
