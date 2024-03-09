@@ -75,7 +75,7 @@ tpm_med.df <- group_by(deNovo_assigned_subfam.df,
 #Add assemblies completely missing due to zero pirs
 tpm_med.df <- bind_rows(missing_assemblies.df, tpm_med.df)
 
-lm.df <- tpm_med.df %>% 
+lm.df <- deNovo_assigned_subfam.df %>% 
   ungroup %>% 
   tidyr::complete(assembly_id, new_subfam_uniq, fill = list(prop_tpm = 0)) %>% 
   arrange(assembly_id, Complete) %>% 
@@ -89,11 +89,8 @@ lm.df <- tpm_med.df %>%
 # group_by(lm.df, assembly_id) %>% summarise(n_distinct(new_subfam_uniq))
 ```
 
-```{r binomial}
-
-deNovo_assigned_subfam.df
-
-bin.df <- group_by(deNovo_assigned_subfam.df, 
+```{r model_df}
+mod.df <- group_by(deNovo_assigned_subfam.df, 
                   assembly_id, 
                   new_subfam_uniq,
                   Complete,
@@ -103,81 +100,24 @@ bin.df <- group_by(deNovo_assigned_subfam.df,
   summarise(TPM_med = sum(TPM_med)) %>% 
   group_by(assembly_id) %>% 
   mutate(total_tpm = round(sum(TPM_med))) %>% 
-  mutate(TPM_med = round(TPM_med))
-
-# Fit the Poisson regression model
-poisson_model <- glm(TPM_med ~ new_subfam_uniq + country + Complete, 
-                     data = bin.df, 
-                     family = "poisson")
-# Summarize the model
-summary(poisson_model)
-
-plot(residuals(poisson_model) ~ fitted(poisson_model))
-qqnorm(residuals(poisson_model))
-qqline(residuals(poisson_model))
-exp(coef(poisson_model))
-
-poisson_model_interaction <- glm(TPM_med ~ new_subfam_uniq * country + Complete, 
-                     data = bin.df, 
-                     family = "poisson")
-summary(poisson_model_interaction)
-
-summary_table <- summary(poisson_model_interaction)
-
-summary.df <- data.frame(coef(summary_table))
-summary.df[,'Pr...z..'] <- round(summary.df[,'Pr...z..'], digits = 7)
-
-# View coefficients ordered by coefficient value
-(coefficients_ordered <- summary.df[rev(order(abs(summary.df$Estimate))),])
-
-coefficients_ordered[grepl(rownames(coefficients_ordered), 
-                           pattern = "country")  & coefficients_ordered$`Pr...z..` < 0.05,]
-
-
-# View coefficients ordered by p-value
-(p_values_ordered <- summary.df[order(summary.df$`Pr...z..`),])
-
-
-# Compare models using likelihood ratio test
-lr_test <- lrtest(poisson_model, poisson_model_interaction)
-print(lr_test)
+  mutate(TPM_med = round(TPM_med)) %>% 
+  ungroup %>% 
+  tidyr::complete(assembly_id, new_subfam_uniq, fill = list(prop_tpm = 0)) %>% 
+  arrange(assembly_id, Complete) %>% 
+  group_by(assembly_id) %>% 
+  # Fill in the NA values for these constant values across assemblies, arrange by Complete so that the filled-in values are used for fill.
+  tidyr::fill(Complete, experiment_id, country, lifecycle_stage) %>% 
+  arrange(assembly_id) %>% 
+  #Remove the NA 'sub-family' from the NA values of the missing assemblies, and remove the liver/sporozoite/ook/ooc samples as these provide little extra information.
+  filter(!is.na(new_subfam_uniq), !str_detect(lifecycle_stage, pattern = 'liver|mosquito_sporozoite|mosquito_oo'))
 ```
 
 ```{r compare_models}
-
-poisson_lifecycle_model <- glm(TPM_med ~ new_subfam_uniq + country * lifecycle_stage + Complete, 
-                               data = bin.df, 
-                               family = "poisson")
-
-# Fit the negative binomial regression model
-negbin_model_interaction <- glm.nb(TPM_med ~ new_subfam_uniq * country + Complete, 
-                                   data = bin.df)
 negbin_lifecycle_model <- glm.nb(TPM_med ~ new_subfam_uniq * country * lifecycle_stage + Complete, 
-                                 data = bin.df)
-new.df <- mutate(bin.df, busco_extra = ifelse(Complete > 50, 'High', 'Low'))
-
-negbin_xtraxtraxtra_model <- glm.nb(TPM_med ~ new_subfam_uniq * country * lifecycle_stage + Complete * experiment_id + busco_extra, 
-                                 data = new.df)
-negbin_xtraxtraxtraxtra_model <- glm.nb(TPM_med ~ new_subfam_uniq * country * lifecycle_stage + Complete * experiment_id * busco_extra, 
-                                 data = new.df)
-
-lr_test <- lrtest(poisson_model, poisson_model_interaction, poisson_lifecycle_model,
-                  negbin_model_interaction, negbin_lifecycle_model
-                  ,negbin_xtra_model,negbin_xtraxtra_model, negbin_xtraxtraxtra_model,negbin_xtraxtraxtraxtra_model)
-summary(negbin_xtra_model)
-print(lr_test)
-
-anova(poisson_model, poisson_model_interaction, poisson_lifecycle_model,
-                  negbin_model_interaction, negbin_lifecycle_model)
+                                 data = mod.df)
 ```
-
-```{r}
-plot(select(ungroup(bin.df), where(is.double) ))
-```
-
 
 ```{r negbio}
-
 # Summarize the model
 summary(negbin_lifecycle_model)
 
@@ -195,89 +135,3 @@ coefficients_ordered$padj <- p.adjust(coefficients_ordered$Pr...z..)
 # Significant p-values
 coefficients_ordered[coefficients_ordered$`Pr...z..` < 0.05,]
 ```
-
-```{r leaps}
-leaps.m <- regsubsets(prop_tpm ~ new_subfam_uniq + Complete + experiment_id + country + lifecycle_stage,
-                      lm.df, 
-                      method = "forward", 
-                      nvmax = 100)
-
-leaps.m <- regsubsets(prop_tpm ~ 0 + new_subfam_uniq*country*lifecycle_stage*experiment_id + Complete,
-                      lm.df, 
-                      # really.big=TRUE,
-                      method = "backward",
-                      nvmax = 100
-                      )
-leaps.sum <- summary(leaps.m)
-leaps.df <- as.data.frame(leaps.sum$outmat)
-leaps_topMod.df <- leaps.df[apply(leaps.df, 2, function(x) any(str_detect(x, pattern = '\\*')))]
-#Order by the number of "*" = the order of best explanatory variables of model
-leaps_topMod.df <- leaps_topMod.df[,order(apply(leaps_topMod.df, 2, function(x) sum(str_count(x, pattern = '\\*'))), decreasing = TRUE)]
-colnames(leaps_topMod.df)
-plot(leaps.m, scale = "adjr2")
-
-data.frame(
-  Adj.R2 = which.max(leaps.sum$adjr2),
-  CP = which.min(leaps.sum$cp),
-  BIC = which.min(leaps.sum$bic)
-)
-
-which.max(leaps.sum$adjr2)
-bestModel <- leaps.sum$which[which.max(leaps.sum$adjr2),]
-bestModel[bestModel]
-
-layout(matrix(1:2, ncol = 2))
-## Adjusted R2
-res.legend <-
-    car::subsets(leaps.m, statistic="adjr2", legend = FALSE, min.size = 1, main = "Adjusted R^2")
-## Mallow Cp
-res.legend <-
-    car::subsets(leaps.m, statistic="cp", legend = FALSE, min.size = 1, main = "Mallow Cp")
-abline(a = 1, b = 1, lty = 2)
-
-expression(prop_tpm ~ 0 + new_subfam_uniq*country*lifecycle_stage + assembly_id + experiment_id + Complete)
-
-lm.sum <- summary(lm(prop_tpm ~ 0 + new_subfam_uniq*country*lifecycle_stage + experiment_id + Complete,
-                      lm.df))
-as.data.frame(lm.sum$coefficients)[as.data.frame(lm.sum$coefficients)$`Pr(>|t|)` < 0.05,] %>% 
-  arrange(desc(`t value`)) %>% mutate(`Pr(>|t|)` = round(`Pr(>|t|)`, digits = 15))
-
-```
-
-```{r}
-
-# id: model id
-# object: regsubsets object
-# data: data used to fit regsubsets
-# outcome: outcome variable
-get_model_formula <- function(id, object, outcome){
-  # get models data
-  models <- summary(object)$which[id,-1]
-  # Get outcome variable
-  #form <- as.formula(object$call[[2]])
-  #outcome <- all.vars(form)[1]
-  # Get model predictors
-  predictors <- names(which(models == TRUE))
-  predictors <- paste(predictors, collapse = "+")
-  # Build model formula
-  as.formula(paste0(outcome, "~", predictors))
-}
-
-library('caret')
-get_cv_error <- function(model.formula, data){
-  set.seed(1)
-  train.control <- trainControl(method = "cv", number = 5)
-  cv <- train(model.formula, data = data, method = "lm",
-              trControl = train.control)
-  cv$results$RMSE
-}
-
-model.ids <- 1:75
-cv.vals <- map(model.ids, get_model_formula, leaps.m, "prop_tpm")%>%
-  map(get_cv_error, data = model.matrix(~ 0 + ., lm.df)) %>%
-  unlist()
-which.min(cv.vals)
-get_model_formula(which.min(cv.vals), leaps.m, "prop_tpm")
-
-```
-
