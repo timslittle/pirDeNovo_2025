@@ -141,9 +141,6 @@ coefficients_ordered[grepl(rownames(coefficients_ordered),
 # Compare models using likelihood ratio test
 lr_test <- lrtest(poisson_model, poisson_model_interaction)
 print(lr_test)
-
-interaction.plot(x = bin.df$country, trace.factor = bin.df$new_subfam_uniq, response = bin.df$TPM_med)
-
 ```
 
 ```{r compare_models}
@@ -157,16 +154,27 @@ negbin_model_interaction <- glm.nb(TPM_med ~ new_subfam_uniq * country + Complet
                                    data = bin.df)
 negbin_lifecycle_model <- glm.nb(TPM_med ~ new_subfam_uniq * country * lifecycle_stage + Complete, 
                                  data = bin.df)
+new.df <- mutate(bin.df, busco_extra = ifelse(Complete > 50, 'High', 'Low'))
+
+negbin_xtraxtraxtra_model <- glm.nb(TPM_med ~ new_subfam_uniq * country * lifecycle_stage + Complete * experiment_id + busco_extra, 
+                                 data = new.df)
+negbin_xtraxtraxtraxtra_model <- glm.nb(TPM_med ~ new_subfam_uniq * country * lifecycle_stage + Complete * experiment_id * busco_extra, 
+                                 data = new.df)
 
 lr_test <- lrtest(poisson_model, poisson_model_interaction, poisson_lifecycle_model,
-                  negbin_model_interaction, negbin_lifecycle_model,
-                  lm(TPM_med ~ new_subfam_uniq * country * lifecycle_stage + Complete, 
-                                 data = bin.df))
+                  negbin_model_interaction, negbin_lifecycle_model
+                  ,negbin_xtra_model,negbin_xtraxtra_model, negbin_xtraxtraxtra_model,negbin_xtraxtraxtraxtra_model)
+summary(negbin_xtra_model)
 print(lr_test)
 
 anova(poisson_model, poisson_model_interaction, poisson_lifecycle_model,
                   negbin_model_interaction, negbin_lifecycle_model)
 ```
+
+```{r}
+plot(select(ungroup(bin.df), where(is.double) ))
+```
+
 
 ```{r negbio}
 
@@ -176,7 +184,7 @@ summary(negbin_lifecycle_model)
 plot(residuals(negbin_lifecycle_model) ~ fitted(negbin_lifecycle_model))
 qqnorm(residuals(negbin_lifecycle_model))
 qqline(residuals(negbin_lifecycle_model))
-exp(coef(negbin_lifecycle_model))
+# exp(coef(negbin_lifecycle_model))
 
 summary.df <- data.frame(coef(summary(negbin_lifecycle_model)))
 summary.df[,'Pr...z..'] <- round(summary.df[,'Pr...z..'], digits = 7)
