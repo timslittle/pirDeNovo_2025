@@ -133,5 +133,5 @@ summary.df[,'Pr...z..'] <- round(summary.df[,'Pr...z..'], digits = 7)
 coefficients_ordered <- summary.df[rev(order(abs(summary.df$Estimate))),]
 coefficients_ordered$padj <- p.adjust(coefficients_ordered$Pr...z..)
 # Significant p-values
-coefficients_ordered[coefficients_ordered$`Pr...z..` < 0.05,]
+coefficients_ordered[coefficients_ordered$`padj` < 0.05,]
 ```
