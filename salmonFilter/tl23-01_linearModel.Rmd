@@ -20,10 +20,8 @@ library('rmarkdown')
 library('seqinr')
 library('ggplot2')
 library('ComplexHeatmap')
-library('leaps')
-library('lmtest')
 
-select
+select <- dplyr::select
 
 safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
                              "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888")
@@ -55,7 +53,9 @@ missing_assemblies <- unique(assembly_stats.df$assembly_id)[!unique(assembly_sta
 
 missing_assemblies.df <- filter(assembly_stats_busco.df, 
                                 assembly_id %in% missing_assemblies) %>% 
-  select(assembly_id, Complete, experiment_id, country, lifecycle_stage)
+  select(assembly_id, Complete, experiment_id, country, lifecycle_stage) %>% 
+  #Put in a dummy sub-family so that we don't have to deal with NA sub-family later.
+  mutate(new_subfam_uniq = 'E_1')
 
 #Fill in the missing values for those with zero of each sub-family
 #Add the missing values (i.e. the zero TPM values for missing sub-families)
@@ -69,7 +69,8 @@ tpm_med.df <- group_by(deNovo_assigned_subfam.df,
                   lifecycle_stage)  %>% 
   summarise(TPM_med = sum(TPM_med)) %>% 
   group_by(assembly_id) %>% 
-  mutate(prop_tpm = TPM_med/sum(TPM_med)) %>% 
+  mutate(total_tpm = round(sum(TPM_med))) %>% 
+  mutate(TPM_med = round(TPM_med)) %>% 
   select(-assembly_id, -TPM_med) 
 
 #Add assemblies completely missing due to zero pirs
@@ -101,19 +102,34 @@ mod.df <- group_by(deNovo_assigned_subfam.df,
   group_by(assembly_id) %>% 
   mutate(total_tpm = round(sum(TPM_med))) %>% 
   mutate(TPM_med = round(TPM_med)) %>% 
-  ungroup %>% 
-  tidyr::complete(assembly_id, new_subfam_uniq, fill = list(prop_tpm = 0)) %>% 
-  arrange(assembly_id, Complete) %>% 
+  ungroup
+
+mod.df <- bind_rows(mod.df, missing_assemblies.df) %>% 
+  tidyr::complete(assembly_id, 
+                  new_subfam_uniq, 
+                  fill = list(TPM_med = 0)) %>% 
+  #Remove NA sub-families
+  filter(!is.na(new_subfam_uniq)) %>% 
   group_by(assembly_id) %>% 
-  # Fill in the NA values for these constant values across assemblies, arrange by Complete so that the filled-in values are used for fill.
-  tidyr::fill(Complete, experiment_id, country, lifecycle_stage) %>% 
-  arrange(assembly_id) %>% 
-  #Remove the NA 'sub-family' from the NA values of the missing assemblies, and remove the liver/sporozoite/ook/ooc samples as these provide little extra information.
+  # Need to remove the assemblies that have no pir TPM at all
+  filter(!(all(is.na(total_tpm)))) %>% 
+  mutate(Complete = unique(na.omit(Complete)),
+         experiment_id = unique(na.omit(experiment_id)),
+         country = unique(na.omit(country)),
+         lifecycle_stage = unique(na.omit(lifecycle_stage)),
+         total_tpm = unique(na.omit(total_tpm)),
+  ) %>% 
   filter(!is.na(new_subfam_uniq), !str_detect(lifecycle_stage, pattern = 'liver|mosquito_sporozoite|mosquito_oo'))
+
+mod.df 
 ```
 
-```{r compare_models}
-negbin_lifecycle_model <- glm.nb(TPM_med ~ new_subfam_uniq * country * lifecycle_stage + Complete, 
+
+```{r make_models}
+#Cannot include " * lifecycle_stage " because of zero values, adding one here but maybe there's a more robust solution
+# TPM_med ~ new_subfam_uniq * country * lifecycle_stage  + Complete
+mod.df$TPM_med <- mod.df$TPM_med + 1
+negbin_lifecycle_model <- glm.nb(TPM_med ~ new_subfam_uniq * country * lifecycle_stage  + Complete, 
                                  data = mod.df)
 ```
 
