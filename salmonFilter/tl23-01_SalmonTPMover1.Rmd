@@ -1129,19 +1129,6 @@ draw(subfam_ht)
 
 ```
 
-```{r lm}
-
-leaps.m <- leaps::regsubsets(prop_tpm ~ ., lm.df, method = "forward")
-summary(leaps.m)
-
-prop_tpm.lm <- lm(prop_tpm ~ 0 + new_subfam_uniq*country*lifecycle_stage + Complete + experiment_id, 
-                  data = lm.df)
-summary(prop_tpm.lm)
-prop_tpm.coef <- coef(summary(prop_tpm.lm)) 
-prop_tpm.coef[prop_tpm.coef[,"Pr(>|t|)"] < .05,]
-arrange(as.data.frame(prop_tpm.coef[prop_tpm.coef[,"Pr(>|t|)"] < .05,], desc('Pr(>|t|)')))
-```
-
 TODO:
 * ~Get ordering of heatmaps right.~
 * There's something wrong with the colour scale of the heatmaps, can be seen when changing filter. - to do with max values?
