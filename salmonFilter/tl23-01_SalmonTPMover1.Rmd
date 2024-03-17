@@ -448,6 +448,9 @@ write_csv(subfam.df,
 #             NumReads_max = max(NumReads),
 #             NumReads_min = min(NumReads))
 # 
+
+### TODO: Somehow only get the median TPMs once (just before the heatmaps) instead of here then getting median again across the sub-family.
+
 # # Get the median TPM and NumReads for each assembly de novo pir
 quant_filtered_sequence.df <-  mutate(quant_filtered.df,
                                       Name_assembly = paste0(Name, '_', assembly)) %>%
