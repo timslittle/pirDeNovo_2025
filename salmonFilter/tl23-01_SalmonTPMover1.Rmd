@@ -841,7 +841,7 @@ assigned_subfam_prop.mat$new_subfam_uniq <- NULL
 
 assigned_subfam_prop.mat[is.na(assigned_subfam_prop.mat)] <- 0
 # max_col <- max(na.omit(assigned_subfam_prop.mat))
-Heatmap(t(assigned_subfam_prop.mat[1:26,]), 
+spec_ht <- Heatmap(t(assigned_subfam_prop.mat[1:26,]), 
         na_col = 'white',
         # cluster_rows = FALSE,
         # cluster_columns = FALSE,
@@ -855,10 +855,17 @@ Heatmap(t(assigned_subfam_prop.mat[1:26,]),
         name = 'Proportion of\n pir numbers',
         )
 
+pdf("../../plots/vvx_Subfam-Propheatmap_Species.pdf")
+draw(spec_ht)
+dev.off()
+
 # biplot(prcomp(t(assigned_subfam_prop.mat)))
+# biplot(prcomp(t(assigned_subfam_prop.mat), scale = TRUE))
+library('ggfortify')
+autoplot(prcomp(t(assigned_subfam_prop.mat), scale = TRUE), loadings.label = TRUE, shape = FALSE, label = TRUE)
 # 
-# pca_spec_subset <- prcomp(t(assigned_subfam_prop.mat[, 
-#                                          str_detect(colnames(assigned_subfam_prop.mat), 
+# pca_spec_subset <- prcomp(t(assigned_subfam_prop.mat[,
+#                                          str_detect(colnames(assigned_subfam_prop.mat),
 #                                                     pattern = 'vvx|de_novo|ovale|cyno')]))
 # summary(pca_spec_subset)
 # biplot(pca_spec_subset)
@@ -949,8 +956,9 @@ country_ht <- Heatmap(country.mat,
                       column_names_gp = gpar(fontsize = 6),
                       col = c('black', 'blue', 'yellow', 'red', 'grey', 'hotpink')[1:length(unique(country.mat))])
 
+pdf("../../plots/vvx_Subfam-Propheatmap_orderCluster.pdf")
 draw(subfam_ht + busco_ht + country_ht)
-
+dev.off()
 # biplot(princomp(t(assigned_subfam_prop.mat), scale = TRUE, center = TRUE))
 
 ```
@@ -1002,22 +1010,25 @@ tpm_ht <- Heatmap(t(assigned_subfam_tpm_prop.mat)[sort(colnames(assigned_subfam_
                                      max(assigned_subfam_tpm_prop.mat)/4,
                                      max(assigned_subfam_tpm_prop.mat)),
                                    c('white',viridis::viridis(3))))
-draw(tpm_ht)
+
+pdf("../../plots/vvx_Subfam-TPMheatmap_orderCluster.pdf")
 draw(tpm_ht + busco_ht + country_ht)
+dev.off()
 ```
 
 ### Sub-family distributions across the **transcription (TPM)** of _pir_\\s from different **assemblies** - ordered by location.
 
 ```{r subfam_tpm_countryOrder_heatmap}
 country_order <- names(country.mat[sort(country.mat, index.return = TRUE)$ix,])
+fonts <- 8
 
 tpm_country_ht <- Heatmap(t(assigned_subfam_tpm_prop.mat)[country_order,], 
         na_col = 'white',
         name = 'Prop TPM',
         cluster_rows = FALSE,
         # cluster_columns = FALSE,
-        row_names_gp = gpar(fontsize = 6),
-        column_names_gp = gpar(fontsize = 6),
+        # row_names_gp = gpar(fontsize = fonts),
+        column_names_gp = gpar(fontsize = fonts),
         row_split = substr(str_replace(country.mat[sort(country.mat, 
                                                         index.return = TRUE)$ix], 
                                        pattern = 'ElSalv', 
@@ -1041,11 +1052,13 @@ busco_country_ht <- Heatmap(busco.mat[country_order,],
 
 country_country_ht <- Heatmap(country.mat[country_order,],
                       name = 'source',
-                      row_names_gp = gpar(fontsize = 6),
-                      column_names_gp = gpar(fontsize = 6),
+                      row_names_gp = gpar(fontsize = fonts),
+                    show_column_names = FALSE,
                       col = c('black', 'blue', 'yellow', 'red', 'grey', 'hotpink')[1:length(unique(country.mat))])
 
+pdf("../../plots/vvx_Subfam-TPMheatmap_orderCountry.pdf")
 draw(tpm_country_ht + busco_country_ht + country_country_ht)
+dev.off()
 ```
 
 ```{r subfam_tpm_buscoOrder_heatmap}
@@ -1080,7 +1093,9 @@ country_busco_ht <- Heatmap(country.mat[busco_order,],
                       column_names_gp = gpar(fontsize = 6),
                       col = c('black', 'blue', 'yellow', 'red', 'grey', 'hotpink')[1:length(unique(country.mat))])
 
+pdf("../../plots/vvx_Subfam-TPMheatmap_orderBUSCO.pdf")
 draw(tpm_busco_ht + busco_busco_ht + country_busco_ht)
+dev.off()
 ```
 
 
@@ -1127,7 +1142,9 @@ subfam_ht <- Heatmap(t(assigned_subfam_prop.mat)[sort(colnames(assigned_subfam_p
                                      max(assigned_subfam_prop.mat)),
                                    c('white',viridis::viridis(3))))
 
+pdf("../../plots/vvx_Subfam-TPMheatmap_Country.pdf")
 draw(subfam_ht)
+dev.off()
 
 #From limited data perhaps PNG (Both the de novo and the P01) is depleted for the largest sub-families (Es).
 
