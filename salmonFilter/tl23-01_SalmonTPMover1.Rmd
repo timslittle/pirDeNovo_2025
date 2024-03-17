@@ -1153,8 +1153,6 @@ dev.off()
 TODO:
 * There's something wrong with the colour scale of the heatmaps, can be seen when changing filter. - to do with max values?
 * What is the prop_TPM calculated from? The sum of medians? Why didn't I use the sum of all samples instead of sum of medians?
-** If including BUSCO and stages in the linear model I need all the zero values too.
 ** Prop for each sample may make more sense for the linear model estimation too.
-
 
 *Check that the BUSCO scores included haven't led to duplicated transcript names in case of same transcript matching two BUSCO.
