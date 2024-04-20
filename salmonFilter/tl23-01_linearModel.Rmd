@@ -64,45 +64,35 @@ missing_assemblies.df <- filter(assembly_stats_busco.df,
 ```
 
 ```{r model_df}
-mod.df <- group_by(deNovo_assigned_subfam.df, 
-                  assembly_id, 
-                  new_subfam_uniq,
-                  Complete,
-                  experiment_id,
-                  country,
-                  lifecycle_stage)  %>% 
-  summarise(TPM_med = sum(TPM_med)) %>% 
-  group_by(assembly_id) %>% 
-  mutate(total_tpm = round(sum(TPM_med))) %>% 
-  mutate(TPM_med = round(TPM_med)) %>% 
-  ungroup
+mod.df <- deNovo_assigned_subfam.df %>% 
+  mutate(TPM = round(TPM))
 
 mod.df <- bind_rows(mod.df, missing_assemblies.df) %>% 
   tidyr::complete(assembly_id, 
                   new_subfam_uniq, 
-                  fill = list(TPM_med = 0)) %>% 
+                  fill = list(TPM = 0)) %>% 
   #Remove NA sub-families
   filter(!is.na(new_subfam_uniq)) %>% 
   group_by(assembly_id) %>% 
-  # Need to remove the assemblies that have no pir TPM at all
-  filter(!(all(is.na(total_tpm)))) %>% 
+  # Fill in the missing labels for the missing data we are adding.
   mutate(Complete = unique(na.omit(Complete)),
          experiment_id = unique(na.omit(experiment_id)),
          country = unique(na.omit(country)),
-         lifecycle_stage = unique(na.omit(lifecycle_stage)),
-         total_tpm = unique(na.omit(total_tpm)),
+         lifecycle_stage = unique(na.omit(lifecycle_stage))
   ) %>% 
-  filter(!is.na(new_subfam_uniq), !str_detect(lifecycle_stage, pattern = 'liver|mosquito_sporozoite|mosquito_oo'))
+  filter(!is.na(new_subfam_uniq), 
+         !str_detect(lifecycle_stage, 
+                     pattern = 'liver|mosquito_sporozoite|mosquito_oo'))
 
-mod.df 
+# group_by(mod.df, assembly_id) %>% summarise(total_tpm = sum(TPM)) %>% arrange(desc(total_tpm)) %>% tail()
 ```
 
 
 ```{r make_models}
 #Cannot include " * lifecycle_stage " because of zero values, adding one here but maybe there's a more robust solution
 # TPM_med ~ new_subfam_uniq * country * lifecycle_stage  + Complete
-mod.df$TPM_med <- mod.df$TPM_med + 1
-negbin_lifecycle_model <- glm.nb(TPM_med ~ new_subfam_uniq * country * lifecycle_stage  + Complete, 
+mod.df$TPM <- mod.df$TPM + 1
+negbin_lifecycle_model <- glm.nb(TPM ~ new_subfam_uniq * country * lifecycle_stage  + Complete, 
                                  data = mod.df)
 ```
 
