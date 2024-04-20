@@ -733,13 +733,13 @@ assembly.df <- unique(select(quant_filtered.df,
 y_max <- max(assembly.df$num_pir)
 
 lapply(c('mosquito','asexual'), function(stages){
-  ggplot(data = filter(assembly.df,
-                              str_detect(lifecycle_stage, 
-                                                     pattern = stages)) , 
-         aes(x = Complete, 
-             y = num_pir, 
-             col = experiment_id,
-             shape = lifecycle_stage)) +
+  busco.plot <- ggplot(data = filter(assembly.df,
+                                     str_detect(lifecycle_stage, 
+                                                pattern = stages)) , 
+                       aes(x = Complete, 
+                           y = num_pir, 
+                           col = experiment_id,
+                           shape = lifecycle_stage)) +
     geom_point(size = 4) +
     scale_shape_manual(values = seq(1,10)) +
     xlab('Percentage of complete BUSCOs') +
@@ -753,6 +753,9 @@ lapply(c('mosquito','asexual'), function(stages){
            shape = guide_legend(ncol = 2)) +
     theme(legend.text = element_text(size = 7),
           legend.key.size = unit(.5,"cm"))
+  ggsave(paste0('../../plots/vivax_BUSCOvNumPir_', stages,'.pdf'),
+         busco.plot)
+  busco.plot
 })
 
 assembly.df[assembly.df$Complete > 50,] %>% arrange(num_pir)
