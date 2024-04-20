@@ -30,6 +30,7 @@ global_save_var <- FALSE
 
 ```{r read_data}
 assigned_subfam.df <- read_csv('pirLabel_newSubfam.csv')
+assigned_subfam.df <- read_csv('pirLabel_newSubfam_quant.csv')
 
 # Manually altered the assembly_stats csv file to include life cycle stages and experimental identifiers.
 assembly_stats.df <- read_csv('assembly_stats_lifecycle.csv') %>%
