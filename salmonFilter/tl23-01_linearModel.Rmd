@@ -78,18 +78,6 @@ tpm_med.df <- group_by(deNovo_assigned_subfam.df,
 #Add assemblies completely missing due to zero pirs
 tpm_med.df <- bind_rows(missing_assemblies.df, tpm_med.df)
 
-lm.df <- deNovo_assigned_subfam.df %>% 
-  ungroup %>% 
-  tidyr::complete(assembly_id, new_subfam_uniq, fill = list(prop_tpm = 0)) %>% 
-  arrange(assembly_id, Complete) %>% 
-  group_by(assembly_id) %>% 
-  # Fill in the NA values for these constant values across assemblies, arrange by Complete so that the filled-in values are used for fill.
-  tidyr::fill(Complete, experiment_id, country, lifecycle_stage) %>% 
-  arrange(assembly_id) %>% 
-  #Remove the NA 'sub-family' from the NA values of the missing assemblies, and remove the liver/sporozoite/ook/ooc samples as these provide little extra information.
-  filter(!is.na(new_subfam_uniq), !str_detect(lifecycle_stage, pattern = 'liver|mosquito_sporozoite|mosquito_oo'))
-
-# group_by(lm.df, assembly_id) %>% summarise(n_distinct(new_subfam_uniq))
 ```
 
 ```{r model_df}
