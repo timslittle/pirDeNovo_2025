@@ -436,7 +436,9 @@ write_csv(subfam.df,
 ```{r gephi}
 # Preparing the data for Gephi input requires some special treatment, including making a number for each node.
 
-### TODO: Somehow only get the median TPMs once (just before the heatmaps) instead of here then getting median again across the sub-family.
+### Prev issue: "Somehow only get the median TPMs once (just before the heatmaps) instead of here then getting median again across the sub-family."
+## I don't think I actually do this, only calculate TPM_med the once. I do calc the prop_TPM using the sum of TPMs, so hopefully that is okay.
+## May be worth repeating the heatmaps with all samples instead of the medians but that is not a priority.
 
 # # Get the median TPM and NumReads for each assembly de novo pir
 quant_filtered_sequence.df <-  mutate(quant_filtered.df,
