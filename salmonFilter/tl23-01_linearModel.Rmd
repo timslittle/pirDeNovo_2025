@@ -61,23 +61,6 @@ missing_assemblies.df <- filter(assembly_stats_busco.df,
 
 #Fill in the missing values for those with zero of each sub-family
 #Add the missing values (i.e. the zero TPM values for missing sub-families)
-
-tpm_med.df <- group_by(deNovo_assigned_subfam.df, 
-                  assembly_id, 
-                  new_subfam_uniq,
-                  Complete,
-                  experiment_id,
-                  country,
-                  lifecycle_stage)  %>% 
-  summarise(TPM_med = sum(TPM_med)) %>% 
-  group_by(assembly_id) %>% 
-  mutate(total_tpm = round(sum(TPM_med))) %>% 
-  mutate(TPM_med = round(TPM_med)) %>% 
-  select(-assembly_id, -TPM_med) 
-
-#Add assemblies completely missing due to zero pirs
-tpm_med.df <- bind_rows(missing_assemblies.df, tpm_med.df)
-
 ```
 
 ```{r model_df}
