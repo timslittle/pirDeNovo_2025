@@ -729,6 +729,8 @@ Asexual stages show that better assemblies demonstrate better _de novo pir_ reco
 
 assembly.df <- unique(select(quant_filtered.df, 
                                      lifecycle_stage, Complete, num_pir, experiment_id))
+# Keep the same axes for both graphs
+y_max <- max(assembly.df$num_pir)
 
 lapply(c('mosquito','asexual'), function(stages){
   ggplot(data = filter(assembly.df,
@@ -743,6 +745,9 @@ lapply(c('mosquito','asexual'), function(stages){
     xlab('Percentage of complete BUSCOs') +
     ylab('Number of pirs') +
     theme_classic() +
+    # Minus one minimum otherwise the zero values are lost.
+    ylim(min = -1, max = y_max) +
+    xlim(min = 0, max = 100) +
     guides(color = guide_legend(ncol = 2),
            size = guide_legend(ncol = 2),
            shape = guide_legend(ncol = 2)) +
