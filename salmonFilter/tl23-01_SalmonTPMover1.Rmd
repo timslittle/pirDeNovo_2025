@@ -787,6 +787,25 @@ assigned_subfam.df <- read_csv('pirLabel_newSubfam.csv')
 
 ```
 
+```{r}
+# Get the new sub-family names in the quant_filtered.df so that we have a data frame of each pir gene, it's expression, and its sub-family.
+#   Note that this has fewer rows than 'assigned_subfam.df' because it will only have the de_novo assembled pirs and not other 
+#     species/reference genes.
+
+quant_filtered_withNewSubfam.df <- mutate(quant_filtered.df,
+                                          Name_assembly = paste0(Name, '_', assembly)) %>% 
+  inner_join(.,
+             select(assigned_subfam.df,
+                    -c(starts_with('TPM')|starts_with('NumReads'))), 
+             by = colnames(assigned_subfam_tmp.df)[colnames(assigned_subfam_tmp.df) %in% colnames(.)])
+
+#Sanity check
+length(unique(quant_filtered_withNewSubfam.df$Name_assembly)) == 6513
+
+write_csv(quant_filtered_withNewSubfam.df, 'pirLabel_newSubfam_quant.csv')
+```
+
+
 ## Ancestral _de novo pir_\ s.
 
 ```{r ancestral_subfam}

@@ -46,6 +46,7 @@ assembly_stats_busco.df <- inner_join(assembly_stats.df, assembly_busco.df)
 ```
 
 ```{r}
+# This contains all pirs including ones not assembled de novo, like the reference transxcriptomes, so remove these.
 deNovo_assigned_subfam.df <- filter(assigned_subfam.df, 
                                     subfam == 'de_novo')
 
