@@ -436,19 +436,6 @@ write_csv(subfam.df,
 ```{r gephi}
 # Preparing the data for Gephi input requires some special treatment, including making a number for each node.
 
-# # Get the info for all the sequences for later.
-# quant_sequence.df <- mutate(quant.df, 
-#                                       Name_assembly = paste0(Name, '_', assembly)) %>% 
-#   # Grouping over all variables except those that are sample specific (as opposed to assembly specific)
-#   group_by(pick(!matches(c('source|sample|file_source|TPM|NumReads|EffectiveLength')))) %>% 
-#   summarise(TPM_med = median(TPM),
-#             TPM_max = max(TPM),
-#             TPM_min = min(TPM),
-#             NumReads_med = median(NumReads),
-#             NumReads_max = max(NumReads),
-#             NumReads_min = min(NumReads))
-# 
-
 ### TODO: Somehow only get the median TPMs once (just before the heatmaps) instead of here then getting median again across the sub-family.
 
 # # Get the median TPM and NumReads for each assembly de novo pir
