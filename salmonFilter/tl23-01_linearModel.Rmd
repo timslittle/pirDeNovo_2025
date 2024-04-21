@@ -135,4 +135,7 @@ coefficients_ordered <- summary.df[rev(order(abs(summary.df$Estimate))),]
 coefficients_ordered$padj <- p.adjust(coefficients_ordered$Pr...z..)
 # Significant p-values
 coefficients_ordered[coefficients_ordered$`padj` < 0.05,]
+
+write_csv(coefficients_ordered[coefficients_ordered$`padj` < 0.05,], 
+          path = 'negbiomodel_results.csv')
 ```
