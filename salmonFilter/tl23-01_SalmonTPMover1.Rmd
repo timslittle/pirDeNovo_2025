@@ -797,7 +797,7 @@ quant_filtered_withNewSubfam.df <- mutate(quant_filtered.df,
   inner_join(.,
              select(assigned_subfam.df,
                     -c(starts_with('TPM')|starts_with('NumReads'))), 
-             by = colnames(assigned_subfam_tmp.df)[colnames(assigned_subfam_tmp.df) %in% colnames(.)])
+             by = colnames(assigned_subfam.df)[colnames(assigned_subfam.df) %in% colnames(.)])
 
 #Sanity check
 length(unique(quant_filtered_withNewSubfam.df$Name_assembly)) == 6513
