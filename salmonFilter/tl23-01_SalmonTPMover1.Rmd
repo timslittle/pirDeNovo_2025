@@ -905,7 +905,8 @@ Beyond that, finding patterns is tricky. Certainly looks to me like most samples
 
 ```{r subfam_dis_expt, show.fig = TRUE}
 assigned_subfam_num.df <- assigned_subfam.df %>% 
-  filter(assembly == 'Meul22_PNG056_vvx' | Complete >= 50) %>% 
+  filter(subfam == 'de_novo') %>% 
+  filter(assembly == 'Meul22_PNG056_vvx' | Complete >= 50) %>%
   group_by(expt, helpful_id, country, assembly_id, I1.4, new_subfam_uniq, Complete) %>% 
   summarise(num_genes = n_distinct(label))
 
