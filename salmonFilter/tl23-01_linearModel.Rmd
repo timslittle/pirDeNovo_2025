@@ -20,6 +20,7 @@ library('rmarkdown')
 library('seqinr')
 library('ggplot2')
 library('ComplexHeatmap')
+library('tidyr')
 
 select <- dplyr::select
 
@@ -29,7 +30,6 @@ global_save_var <- FALSE
 ```
 
 ```{r read_data}
-assigned_subfam.df <- read_csv('pirLabel_newSubfam.csv')
 assigned_subfam.df <- read_csv('pirLabel_newSubfam_quant.csv')
 
 # Manually altered the assembly_stats csv file to include life cycle stages and experimental identifiers.
@@ -50,6 +50,7 @@ assembly_stats_busco.df <- inner_join(assembly_stats.df, assembly_busco.df)
 # This contains all pirs including ones not assembled de novo, like the reference transxcriptomes, so remove these.
 deNovo_assigned_subfam.df <- filter(assigned_subfam.df, 
                                     subfam == 'de_novo')
+rm(assigned_subfam.df)
 
 missing_assemblies <- unique(assembly_stats.df$assembly_id)[!unique(assembly_stats.df$assembly_id) %in% unique(deNovo_assigned_subfam.df$assembly_id)]
 
@@ -61,54 +62,53 @@ missing_assemblies.df <- filter(assembly_stats_busco.df,
 
 #Fill in the missing values for those with zero of each sub-family
 #Add the missing values (i.e. the zero TPM values for missing sub-families)
+
+#Need the sample names too otherwise the 'complete' function in the next section will not work.
+# 
+# quant.files <- c(
+#   system("ls ../../nextflow/vvx_*/salmon/*/quant.sf", 
+#        intern = TRUE),
+#   system("ls ../../salmon_manual/quant/*/quant.sf", 
+#        intern = TRUE)
+# )
+# 
+# assembly_sample.df <- data.frame(assemblies = str_extract(quant.files, pattern = '(?<=_vvx_T[[:digit:]]{1,2}_).+(?=/quant.sf)'),
+#                                  samples = str_extract(quant.files, pattern = '(?<=(salmon|quant)/).+_T[[:digit:]]{1,2}'))
+
 ```
 
 ```{r model_df}
 mod.df <- deNovo_assigned_subfam.df %>% 
   mutate(TPM = round(TPM))
 
-mod.df <- bind_rows(mod.df, missing_assemblies.df) %>% 
-  tidyr::complete(assembly_id,
-                  sample,
-                  new_subfam_uniq,
-                  country,
-                  lifecycle_stage,
-                  Complete,
+mod.df <- group_by(mod.df, 
+                   assembly_id,
+                   experiment_id,
+                   new_subfam_uniq,
+                   # sample,
+                   country,
+                   lifecycle_stage,
+                   Complete) %>% 
+  summarise(TPM = sum(TPM)) %>% 
+  # bind_rows(missing_assemblies.df) %>% 
+  ungroup() %>% 
+  tidyr::complete(new_subfam_uniq,
+                  nesting(assembly_id,
+                          experiment_id,
+                          # sample,
+                          country,
+                          lifecycle_stage,
+                          Complete
+                  ),
                   fill = list(TPM = 0)) %>% 
   #Remove NA sub-families
   filter(!is.na(new_subfam_uniq)) %>% 
-  group_by(assembly_id) %>% 
-  # Fill in the missing labels for the missing data we are adding.
-  mutate(Complete = unique(na.omit(Complete)),
-         experiment_id = unique(na.omit(experiment_id)),
-         country = unique(na.omit(country)),
-         lifecycle_stage = unique(na.omit(lifecycle_stage))
-  ) %>% 
   filter(!is.na(new_subfam_uniq), 
          !str_detect(lifecycle_stage, 
                      pattern = 'liver|mosquito_sporozoite|mosquito_oo'))
 
-# group_by(mod.df, assembly_id) %>% summarise(total_tpm = sum(TPM)) %>% arrange(desc(total_tpm)) %>% tail()
+# group_by(mod.df, assembly_id) %>% summarise(total_tpm = sum(TPM)) %>% arrange(desc(total_tpm)) %>% head()
 ```
-
-```{r}
-mod.df <- group_by(mod.df, 
-         assembly_id, 
-         new_subfam_uniq,
-         sample,
-         country,
-         lifecycle_stage,
-         Complete) %>% 
-  summarise(TPM = sum(TPM)) %>% 
-  group_by(sample) %>% 
-  mutate(prop_TPM = round(TPM/sum(TPM), digits = 4)) %>% 
-  #I admit that I don't know why there are NAs here
-  filter(!is.na(sample)) %>% 
-  arrange(desc(prop_TPM))
-
-# group_by(mod.df, sample) %>% summarise(n = n_distinct(new_subfam_uniq)) %>% arrange(desc(n))
-```
-
 
 ```{r make_models}
 #Cannot include " * lifecycle_stage " because of zero values, adding one here but maybe there's a more robust solution
