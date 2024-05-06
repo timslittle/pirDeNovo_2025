@@ -131,7 +131,10 @@ quant_subfam.df <- left_join(quant_filtered.df,
   left_join(blast99_denovo.df, by = c('Name', 'assembly')) 
 
 # Filter for the genes with ooc/ook/gametes mentioned and NA (the pir genes, these don't match a BUSCO) 
-quant_subfam.df <- filter(quant_subfam.df, grepl(Description.y, pattern = regex('oocyst|ookinete|gamete', ignore_case = TRUE)) | is.na(Description.y) )
+quant_subfam.df <- filter(quant_subfam.df, 
+                          grepl(Description.y, pattern = regex('oocyst|ookinete|gamete', ignore_case = TRUE)) | is.na(Description.y) ) %>% 
+  #Filter out the 18h-Inf samples as they're weird.
+  filter(helpful_sample_name != '18h-inf')
 
 quant_subfam.df$new_subfam_uniq[is.na(quant_subfam.df$new_subfam_uniq)] <- 'ref'
 
