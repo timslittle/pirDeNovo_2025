@@ -128,7 +128,9 @@ quant_subfam.df <- left_join(quant_filtered.df,
                              by = c('Name', 'hmmer_path')) %>% 
   left_join(unique(select(assigned_subfam.df, 'hmmer_path', "assembly_id")), by = c('hmmer_path')) %>% 
   inner_join(sample_helpful_names.df, by = 'sample') %>%
-  left_join(blast99_denovo.df, by = c('Name', 'assembly'))
+  left_join(blast99_denovo.df, by = c('Name', 'assembly')) %>% 
+  # Filter for the genes with ooc/ook/gametes mentioned and NA (the pir genes, these don't match a BUSCO) 
+  filter(grepl(Description.y, pattern = regex('oocyst|ookinete|gamete', ignore_case = TRUE)) | is.na(Description.y) )
 
 quant_subfam.df$new_subfam_uniq[is.na(quant_subfam.df$new_subfam_uniq)] <- 'ref'
 
@@ -252,110 +254,6 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id),
                    })
        })
 ```
-
-```{r}
-lapply(unique(expt.df$assembly_id), 
-                   function(assm.id){
-                     # print(assm.id)
-                     assm.df <- expt.df[expt.df$assembly_id == assm.id,] 
-                     # Filter pirs by one tenth of max value, unless this is lower than one.
-                     tpm_pir_max_filter <- ifelse(max(assm.df$TPM[!is.na(assm.df$E.value_fullseq)]) > 10,
-                                                  round(max(assm.df$TPM[!is.na(assm.df$E.value_fullseq)])/10),
-                                                  1)
-                     #Filter by max_TPM but include na values (as these are the non-pir reference genes).
-                     assm.df <-  filter(assm.df, TPM_max >= 0 | is.na(TPM_max))
-                     if(nrow(assm.df) == 0) {return(NULL)}
-                     # reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med ~ sample + helpful_sample_name, value.var = 'TPM') 
-                     tpm.df <- reshape2::dcast(assm.df, 
-                                               Name + label + new_subfam_uniq + TPM_med + id99_ref + Description.y ~ helpful_sample_name, 
-                                               value.var = 'TPM') %>% 
-                       arrange(desc(TPM_med)) %>% 
-                       #Use factors here to order by the largest TPM_median sub-families.
-                       mutate(new_subfam_uniq = factor(new_subfam_uniq, levels = unique(new_subfam_uniq)),
-                              rownames = case_when(label %in% ancestral_genes_denovo ~ 'anc',
-                                                   str_detect(id99_ref, pattern = 'P') ~ id99_ref,
-                                                   !is.na(Description.y) ~ Description.y)) %>% 
-                       arrange(new_subfam_uniq, desc(TPM_med))
-                     
-                     #Only show the relevant 'ref' genes for comparison
-                     if(grepl(expt.id, pattern = 'Mosq')){
-                       tpm.df <- filter(tpm.df, 
-                                        new_subfam_uniq != 'ref' | grepl(rownames, 
-                                                                         ignore.case = TRUE, 
-                                                                         pattern = 'Gam|Ook|Ooc|Malate|Ribonucleoside-diphosphate'))
-                     }
-                     
-                     tpm_pir.index <- tpm.df$new_subfam_uniq != 'ref'
-                     tpm_ref.index <- tpm.df$new_subfam_uniq == 'ref'
-                     
-                     tpm.mat <- as.matrix(select(tpm.df, -Name, -new_subfam_uniq, -TPM_med, -id99_ref, -rownames, -label, -Description.y))
-                     rownames(tpm.mat) <- ifelse(is.na(tpm.df$rownames), '', tpm.df$rownames)
-                     tpm.mat <- tpm.mat[,ordering(colnames(tpm.mat), order_vector = ordering_vector), drop = FALSE]
-                     
-                     tpm_pir.mat <- tpm.mat[tpm_pir.index,]
-                     tpm_ref.mat <- tpm.mat[tpm_ref.index,]
-                     
-                     subfam.mat <- as.matrix(select(tpm.df, new_subfam_uniq))[tpm_pir.index,]
-                     
-                     tmp_pir.max <- plyr::round_any(max(tpm_pir.mat), 10, f = ceiling)
-                     pir.ht <- Heatmap(tpm_pir.mat, 
-                                       cluster_rows = FALSE, 
-                                       cluster_columns = FALSE,
-                                       column_names_gp = gpar(fontsize = 7),
-                                       row_split = factor(c(subfam.mat), levels = unique(subfam.mat)),
-                                       row_title_rot = 0,
-                                       row_title_gp = gpar(fontsize = 7),
-                                       show_row_names = TRUE,
-                                       name = 'TPM pir',
-                                       column_title = assm.id,
-                                       border = TRUE,
-                                       row_names_gp = gpar(fontsize = 5),
-                                       col = circlize::colorRamp2(c(0, 
-                                                                    tmp_pir.max/4,
-                                                                    tmp_pir.max/2,
-                                                                    tmp_pir.max*3/4,
-                                                                    tmp_pir.max),
-                                                                  c('white',
-                                                                    viridis::viridis(4)))
-                     )
-                     
-                     if(length(tpm_ref.mat) >= 1){
-                       tmp_ref.max <- plyr::round_any(max(tpm_ref.mat), 100, f = ceiling)
-                       ref.ht <- Heatmap(tpm_ref.mat, 
-                                         cluster_rows = FALSE, 
-                                         cluster_columns = FALSE,
-                                         column_names_gp = gpar(fontsize = 7),
-                                         row_title_rot = 0,
-                                         show_row_names = TRUE,
-                                         show_heatmap_legend = TRUE,
-                                         name = 'TPM ref genes',
-                                         column_title = assm.id,
-                                         border = TRUE,
-                                         row_names_gp = gpar(fontsize = 5),
-                                         col = circlize::colorRamp2(c(0, 
-                                                                      tmp_ref.max/4,
-                                                                      tmp_ref.max/2,
-                                                                      tmp_ref.max*3/4,
-                                                                      tmp_ref.max),
-                                                                    c('white',
-                                                                      viridis::magma(4)))
-                       )
-                       if(global_save_var){
-                         pdf(paste0('../../plots/vvx_TPMheatmap_', expt.id, '_', assm.id, '.pdf'),
-                             width = 7, height = 4)
-                       }
-                       draw(pir.ht %v% ref.ht)
-                       dev.off()
-                       return(pir.ht %v% ref.ht)
-                     } else {
-                       return(pir.ht)
-                     }
-                     
-                     return()
-                   })
-```
-
-
 By 26h are we seeing gametocytes that have escaped the inactivation?
 
 Some of the gametocyte markers appear quite high in 'asexual' samples.
