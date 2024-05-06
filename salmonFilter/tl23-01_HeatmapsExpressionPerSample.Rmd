@@ -237,8 +237,7 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id),
                                                                       tmp_ref.max/2,
                                                                       tmp_ref.max*3/4,
                                                                       tmp_ref.max),
-                                                                    c('white',
-                                                                      viridis::magma(4)))
+                                                                    c('white', rev(viridis::magma(4))))
                        )
                        if(global_save_var){
                          pdf(paste0('../../plots/vvx_TPMheatmap_', expt.id, '_', assm.id, '.pdf'),
