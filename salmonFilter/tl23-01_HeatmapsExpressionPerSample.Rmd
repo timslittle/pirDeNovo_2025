@@ -29,7 +29,7 @@ library('ComplexHeatmap')
 
 safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
                              "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888")
-global_save_var <- FALSE
+global_save_var <- TRUE
 ```
 
 ```{r function_ordering}
@@ -197,6 +197,15 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id),
                   
                   tpm_pir.mat <- tpm.mat[tpm_pir.index,]
                   tpm_ref.mat <- tpm.mat[tpm_ref.index,]
+                  tpm_ref.filter <- 10
+                  
+                  if(is.null(dim(tpm_ref.mat))) {
+                    # Only 1D vector.
+                    tpm_ref.mat <- tpm_ref.mat[tpm_ref.mat > tpm_ref.filter]
+                  }
+                  else if(length(tpm_ref.mat) >= 1){
+                    tpm_ref.mat <- tpm_ref.mat[apply(tpm_ref.mat,1,sum) > tpm_ref.filter,]
+                  }
                   
                   subfam.mat <- as.matrix(select(tpm.df, new_subfam_uniq))[tpm_pir.index,]
                   
