@@ -932,7 +932,7 @@ assigned_subfam_prop.mat[is.na(assigned_subfam_prop.mat)] <- 0
 # max_col <- max(na.omit(assigned_subfam_prop.mat))
 subfam_ht <- Heatmap(t(assigned_subfam_prop.mat)[sort(colnames(assigned_subfam_prop.mat)),], 
         na_col = 'white',
-        name = 'Prop subfam',
+        name = 'Prop Sub-fam',
         # cluster_rows = FALSE,
         # cluster_columns = FALSE,
         row_names_gp = gpar(fontsize = 6),
@@ -957,7 +957,7 @@ busco.mat <- matrix(busco.mat[duplicated_val])
 rownames(busco.mat) <- names_busco.mat[duplicated_val]
 
 busco_ht <- Heatmap(busco.mat[sort(rownames(busco.mat)),],
-                    name = 'busco',
+                    name = 'BUSCO',
                     cluster_rows = FALSE,
                     cluster_columns = FALSE,
                     show_column_names = FALSE,
@@ -971,7 +971,7 @@ country.mat <- t(as.matrix(reshape2::dcast(unique(select(assigned_subfam_prop.df
                                            1 ~ helpful_id,
                                            value.var = 'country')[,-1]))
 country_ht <- Heatmap(country.mat,
-                      name = 'source',
+                      name = 'Source',
                       row_names_gp = gpar(fontsize = 6),
                       column_names_gp = gpar(fontsize = 6),
                       col = c('black', 'blue', 'yellow', 'red', 'grey', 'hotpink')[1:length(unique(country.mat))])
@@ -1061,7 +1061,7 @@ tpm_country_ht <- Heatmap(t(assigned_subfam_tpm_prop.mat)[country_order,],
                                    c('white',viridis::viridis(3))))
 
 busco_country_ht <- Heatmap(busco.mat[country_order,],
-                    name = 'busco',
+                    name = 'BUSCO',
                     cluster_rows = FALSE,
                     cluster_columns = FALSE,
                     show_column_names = FALSE,
@@ -1071,7 +1071,7 @@ busco_country_ht <- Heatmap(busco.mat[country_order,],
                                                c(viridis::magma(3))))
 
 country_country_ht <- Heatmap(country.mat[country_order,],
-                      name = 'source',
+                      name = 'Source',
                       row_names_gp = gpar(fontsize = fonts),
                     show_column_names = FALSE,
                       col = c('black', 'blue', 'yellow', 'red', 'grey', 'hotpink')[1:length(unique(country.mat))])
@@ -1098,7 +1098,7 @@ tpm_busco_ht <- Heatmap(t(assigned_subfam_tpm_prop.mat)[busco_order,],
                                    c('white',viridis::viridis(3))))
 
 busco_busco_ht <- Heatmap(busco.mat[busco_order,],
-                    name = 'busco',
+                    name = 'BUSCO',
                     cluster_rows = FALSE,
                     cluster_columns = FALSE,
                     show_column_names = FALSE,
@@ -1108,7 +1108,7 @@ busco_busco_ht <- Heatmap(busco.mat[busco_order,],
                                                c(viridis::magma(3))))
 
 country_busco_ht <- Heatmap(country.mat[busco_order,],
-                      name = 'source',
+                      name = 'Source',
                       row_names_gp = gpar(fontsize = 6),
                       column_names_gp = gpar(fontsize = 6),
                       col = c('black', 'blue', 'yellow', 'red', 'grey', 'hotpink')[1:length(unique(country.mat))])
@@ -1150,7 +1150,7 @@ assigned_subfam_prop.mat[is.na(assigned_subfam_prop.mat)] <- 0
 # max_col <- max(na.omit(assigned_subfam_prop.mat))
 subfam_ht <- Heatmap(t(assigned_subfam_prop.mat)[sort(colnames(assigned_subfam_prop.mat)),], 
         na_col = 'white',
-        name = 'Prop subfam',
+        name = 'Prop Sub-fam',
         # cluster_rows = FALSE,
         # cluster_columns = FALSE,
         row_names_gp = gpar(fontsize = 6),
