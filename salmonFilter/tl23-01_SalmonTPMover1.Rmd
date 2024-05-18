@@ -874,7 +874,7 @@ spec_ht <- Heatmap(t(assigned_subfam_prop.mat[1:26,]),
         name = 'Proportion of\n pir numbers',
         )
 
-pdf("../../plots/vvx_Subfam-Propheatmap_Species.pdf")
+pdf("../../plots/vvx_Subfam-Propheatmap_Species.pdf", width = 7, height = 5)
 draw(spec_ht)
 dev.off()
 
