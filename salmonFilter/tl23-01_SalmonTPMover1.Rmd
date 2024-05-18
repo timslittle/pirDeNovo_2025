@@ -976,7 +976,7 @@ country_ht <- Heatmap(country.mat,
                       column_names_gp = gpar(fontsize = 6),
                       col = c('black', 'blue', 'yellow', 'red', 'grey', 'hotpink')[1:length(unique(country.mat))])
 
-pdf("../../plots/vvx_Subfam-Propheatmap_orderCluster.pdf")
+pdf("../../plots/vvx_Subfam-Propheatmap_orderCluster.pdf", width = 7, height = 5)
 draw(subfam_ht + busco_ht + country_ht)
 dev.off()
 # biplot(princomp(t(assigned_subfam_prop.mat), scale = TRUE, center = TRUE))
@@ -1031,7 +1031,7 @@ tpm_ht <- Heatmap(t(assigned_subfam_tpm_prop.mat)[sort(colnames(assigned_subfam_
                                      max(assigned_subfam_tpm_prop.mat)),
                                    c('white',viridis::viridis(3))))
 
-pdf("../../plots/vvx_Subfam-TPMheatmap_orderCluster.pdf")
+pdf("../../plots/vvx_Subfam-TPMheatmap_orderCluster.pdf", width = 7, height = 5)
 draw(tpm_ht + busco_ht + country_ht)
 dev.off()
 ```
@@ -1076,7 +1076,7 @@ country_country_ht <- Heatmap(country.mat[country_order,],
                     show_column_names = FALSE,
                       col = c('black', 'blue', 'yellow', 'red', 'grey', 'hotpink')[1:length(unique(country.mat))])
 
-pdf("../../plots/vvx_Subfam-TPMheatmap_orderCountry.pdf")
+pdf("../../plots/vvx_Subfam-TPMheatmap_orderCountry.pdf", width = 7, height = 5)
 draw(tpm_country_ht + busco_country_ht + country_country_ht)
 dev.off()
 ```
@@ -1113,7 +1113,7 @@ country_busco_ht <- Heatmap(country.mat[busco_order,],
                       column_names_gp = gpar(fontsize = 6),
                       col = c('black', 'blue', 'yellow', 'red', 'grey', 'hotpink')[1:length(unique(country.mat))])
 
-pdf("../../plots/vvx_Subfam-TPMheatmap_orderBUSCO.pdf")
+pdf("../../plots/vvx_Subfam-TPMheatmap_orderBUSCO.pdf", width = 7, height = 5)
 draw(tpm_busco_ht + busco_busco_ht + country_busco_ht)
 dev.off()
 ```
@@ -1162,7 +1162,7 @@ subfam_ht <- Heatmap(t(assigned_subfam_prop.mat)[sort(colnames(assigned_subfam_p
                                      max(assigned_subfam_prop.mat)),
                                    c('white',viridis::viridis(3))))
 
-pdf("../../plots/vvx_Subfam-TPMheatmap_Country.pdf")
+pdf("../../plots/vvx_Subfam-TPMheatmap_Country.pdf", width = 7, height = 5)
 draw(subfam_ht)
 dev.off()
 
