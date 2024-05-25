@@ -590,8 +590,8 @@ edges.df <- mutate(blast_filt_dedup.df,
        Type = 'undirected') %>%
   select(Source, Target, Type)
 
-write_csv(edges.df,
-          '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_edges.csv')
+# write_csv(edges.df,
+#           '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_edges.csv')
 
 ```
 
