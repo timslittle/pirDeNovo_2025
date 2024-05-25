@@ -618,7 +618,7 @@ blast99_denovo.df <- mutate(blast99.df,
   filter(!is.na(Name)) %>% 
   select(Name, assembly, id99_ref, id99_nonref)
 
-write_csv(blast99_denovo.df, 'denovoPir_blast99matches.csv')
+# write_csv(blast99_denovo.df, 'denovoPir_blast99matches.csv')
 blast99_denovo.df <- read_csv('denovoPir_blast99matches.csv')
 
 # select(blast_filt_dedup.df, pident, qcovhsp, qend, qstart, length, gapopen, mismatch) %>% 
