@@ -354,8 +354,8 @@ subfam.df$subfam[grepl(subfam.df$Name, pattern = 'PVX')] <- sapply(
 # Test subfam assignment
 # left_join(lopez13_sal1Subfam, mutate(subfam.df, name = Name), by = 'name')
 
-write_csv(subfam.df,
-          path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_Sal1subfam.csv')
+# write_csv(subfam.df,
+#           path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_Sal1subfam.csv')
 ```
 
 ```{r gephi}
@@ -407,8 +407,8 @@ gephi_mcl.df <- full_join(gephi.df, mcl.df, by = 'label')
 
 # any(is.na(gephi_mcl.df$Name_assembly))
 
-write_csv(gephi_mcl.df,
-          path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_info.csv')
+# write_csv(gephi_mcl.df,
+#           path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_info.csv')
 ```
 
 ```{r best_network, show = FALSE}
