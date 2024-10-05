@@ -790,24 +790,29 @@ assigned_subfam_prop.mat$new_subfam_uniq <- NULL
 
 assigned_subfam_prop.mat[is.na(assigned_subfam_prop.mat)] <- 0
 # max_col <- max(na.omit(assigned_subfam_prop.mat))
-spec_ht <- Heatmap(t(assigned_subfam_prop.mat[1:26,]), 
+(spec_ht <- Heatmap(t(assigned_subfam_prop.mat[1:26,]), 
         na_col = 'white',
         # cluster_rows = FALSE,
         # cluster_columns = FALSE,
         row_split = 4,
         # column_split = 3,
-        row_names_gp = gpar(fontsize = 6),
+        row_names_gp = gpar(fontsize = 12),
+        column_names_gp = gpar(fontsize = 14),
+        column_names_rot = 55,
         col = circlize::colorRamp2(c(0,0.0001,
                                      max(assigned_subfam_prop.mat)/8,
                                      max(assigned_subfam_prop.mat)),
-                                   c('white',viridis::viridis(3))),
-        name = 'Proportion of\n pir numbers',
-        )
+                                   c('white',viridis::cividis(3))),
+        heatmap_legend_param  = list(title_gp = gpar(fontsize = 14)),
+        name = 'Proportion of\n pir numbers\n',
+        ) )
 
-pdf("../../plots/vvx_Subfam-Propheatmap_Species.pdf", width = 7, height = 5)
+pdf("../../plots/Fig5_vvx_Subfam-Propheatmap_Species.pdf", width = 8, height = 6)
 draw(spec_ht)
 dev.off()
+```
 
+```{r}
 # biplot(prcomp(t(assigned_subfam_prop.mat)))
 # biplot(prcomp(t(assigned_subfam_prop.mat), scale = TRUE))
 library('ggfortify')
