@@ -490,6 +490,8 @@ subfam_graph.df <- gephi_mcl.df %>%
   select(-c(starts_with('I')), infl) %>% 
   arrange(across(infl)) %>% 
   group_by(across(infl)) %>% 
+  # Restrict to top 25 clusters.
+  filter(get(infl) < 26) %>% 
   mutate(infl_net = factor(
     # do.call(
     paste0(get(infl), ' (n = ', n_distinct(label), ')')
@@ -500,26 +502,27 @@ subfam_graph.df <- gephi_mcl.df %>%
   # mutate(subfam = ifelse(str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$'),
   #                      subfam, 
   #                      'none')) %>% 
-  group_by(subfam, species, infl_net) %>% 
+  group_by(subfam, species, infl_net, .drop = FALSE) %>% 
   dplyr::summarise(number = n_distinct(label))
 
 max_y <- max(summarise(group_by(subfam_graph.df, infl_net), sum_num = sum(number))$sum_num)
 breaks_y <- seq(0, plyr::round_any(max_y, 5, ceiling), 5)
 
-# subfam_graph.plot <- ggplot(subfam_graph.df, aes(x = infl_net, y = number, fill = subfam)) +
-#     geom_col(position = 'stack') +
-#     xlab('Cluster ID (total number of pirs in cluster)') +
-#     ylab('Number of Sal1 pirs') +
-#     scale_fill_manual(values = subfam_col, 
-#                       name = 'Sal1 sub-family') +
-#     scale_y_continuous(breaks = breaks_y, 
-#                        # limits = c(0, max(breaks_y))
-#     ) +
-#     theme_classic()+
-#     theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+( subfam_graph.plot <- ggplot(subfam_graph.df, aes(x = infl_net, y = number, fill = subfam)) +
+    geom_col(position = 'stack') +
+    xlab('Cluster ID (total number of pirs in cluster)') +
+    ylab('Number of Sal1 pirs in each cluster') +
+    scale_fill_manual(values = subfam_col,
+                      name = 'Sal1 sub-family') +
+    scale_y_continuous(breaks = breaks_y,
+                       # limits = c(0, max(breaks_y))
+    ) +
+    theme_classic()+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) )
 
-# ggsave('../../plots/vivax_subfamDisI14Network.pdf', 
-#        subfam_graph.plot)
+ggsave('../../plots/Fig3_vivax_subfamDisI14Network.pdf',
+       height = 5,
+       subfam_graph.plot)
 
 ```
 
