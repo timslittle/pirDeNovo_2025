@@ -631,7 +631,7 @@ blast99_denovo.df <- read_csv('denovoPir_blast99matches.csv')
 Interesting that some pirs have 99% matches with other pirs from same expt but different datasets e.g.:
 * NonamEVm000405t1_Meul22_PNG056_vvx matches NonamEVm003070t2_Meul22_Pv024_vvx.
 
-# Assembly statistics
+# Assembly statistics - Figure 2
 
 Plots of the number of _de novo pir_\s vs quality score (BUSCOs - percentage of conserved orthologs expected in the assemblies that were actually found), separated into mosquito and human-infection parasite stages.
 
@@ -654,7 +654,7 @@ lapply(c('mosquito','asexual'), function(stages){
                            y = num_pir, 
                            col = experiment_id,
                            shape = lifecycle_stage)) +
-    geom_point(size = 4) +
+    geom_point(size = 3, stroke  = 2) +
     scale_shape_manual(values = seq(1,10)) +
     xlab('Percentage of complete BUSCOs') +
     ylab('Number of pirs') +
@@ -662,12 +662,18 @@ lapply(c('mosquito','asexual'), function(stages){
     # Minus one minimum otherwise the zero values are lost.
     ylim(min = -1, max = y_max) +
     xlim(min = 0, max = 100) +
-    guides(color = guide_legend(ncol = 2),
-           size = guide_legend(ncol = 2),
-           shape = guide_legend(ncol = 2)) +
-    theme(legend.text = element_text(size = 7),
-          legend.key.size = unit(.5,"cm"))
-  ggsave(paste0('../../plots/vivax_BUSCOvNumPir_', stages,'.pdf'),
+    guides(color = guide_legend(ncol = 1,
+                                title = 'Experiment ID', 
+                                byrow = TRUE,
+                                order = 1),
+           shape = guide_legend(ncol = 1, 
+                                title = 'Lifecycle stage', 
+                                byrow = TRUE)) +
+    theme(legend.text = element_text(size = 10),
+          legend.key.size = unit(.5,"cm"),
+          legend.spacing.y = unit(.25, 'cm'),
+          text = element_text(size = 20))
+  ggsave(paste0('../../plots/Fig2_vivax_BUSCOvNumPir_', stages,'.pdf'),
          busco.plot)
   busco.plot
 })
