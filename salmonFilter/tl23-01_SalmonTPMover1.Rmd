@@ -61,9 +61,9 @@ experiment.vec <- c('Bourgard21', 'Imp22', 'K19', 'Meul22',
 
 quant.files <- c(
   system("ls ../../nextflow/vvx_*/salmon/*/quant.sf", 
-       intern = TRUE),
+         intern = TRUE),
   system("ls ../../salmon_manual/quant/*/quant.sf", 
-       intern = TRUE)
+         intern = TRUE)
 )
 
 assemblies.list <- str_extract(quant.files, pattern = '(?<=_vvx_T[[:digit:]]{1,2}_).+(?=/quant.sf)') %>% unique
@@ -236,7 +236,7 @@ comp_busco_genes <- c('Secreted ookinete protein, putative',
                       'Fructose-bisphosphate aldolase',
                       
                       'Chloroquine resistance transporter'
-                      )
+)
 
 # For Pvivax housekeeping gene: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4704153/
 
@@ -395,8 +395,8 @@ gephi.df <- mutate(subfam.df,
 
 ```{r mcl}
 mcl.files <- list.files(path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_mcl',
-           pattern = 'deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_all2all.mci.I.+list',
-           full.names = TRUE)
+                        pattern = 'deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_all2all.mci.I.+list',
+                        full.names = TRUE)
 #Read in the mcl files and combine them by the name using Reduce to apply full_join across the list.
 mcl.df <- lapply(mcl.files, function(mcl_file){
   mcl_infl <- str_extract(mcl_file, pattern = '(?<=\\.)I.+(?=\\.list$)')
@@ -453,12 +453,12 @@ lapply( str_subset(colnames(gephi_mcl.df), pattern = '^I[[:digit:]]'),
             arrange(across(infl)) %>% 
             group_by(across(infl)) %>% 
             mutate(infl_net = factor(
-                # do.call(
-                paste0(get(infl), ' (n = ', n_distinct(label), ')')
-                # , list(infl = infl, label = label)
+              # do.call(
+              paste0(get(infl), ' (n = ', n_distinct(label), ')')
+              # , list(infl = infl, label = label)
               # )
             )) %>% 
-          filter(str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$')) %>%
+            filter(str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$')) %>%
             # mutate(subfam = ifelse(str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$'),
             #                      subfam, 
             #                      'none')) %>% 
@@ -580,7 +580,7 @@ ancestral_genes <- c('PVX_113230',
                      'PVP01_1147700')
 
 ancestral_blast.df <- filter(blast_filt_dedup.df,
-       str_detect(qseqid, pattern = ancestral_genes) | str_detect(sseqid, pattern = ancestral_genes)) %>% 
+                             str_detect(qseqid, pattern = ancestral_genes) | str_detect(sseqid, pattern = ancestral_genes)) %>% 
   arrange(desc(bitscore)) %>% 
   filter(pident >= 95)
 
@@ -588,9 +588,9 @@ ancestral_genes_denovo <- unique(c(ancestral_blast.df$qseqid, ancestral_blast.df
 write.table(ancestral_genes_denovo, 'ancestralGenes_denovo.txt')
 
 edges.df <- mutate(blast_filt_dedup.df,
-       Source = gephi.df$Id[match(qseqid, gephi.df$label)],
-       Target = gephi.df$Id[match(sseqid, gephi.df$label)],
-       Type = 'undirected') %>%
+                   Source = gephi.df$Id[match(qseqid, gephi.df$label)],
+                   Target = gephi.df$Id[match(sseqid, gephi.df$label)],
+                   Type = 'undirected') %>%
   select(Source, Target, Type)
 
 # write_csv(edges.df,
@@ -605,9 +605,9 @@ edges.df <- mutate(blast_filt_dedup.df,
 # `(send - sstart - mismatch + 1)/slen >= .99` is to calculate scovhsp, although I don't know if this calculation is entirely correct and may not include gaps. qcovhsp is oddly poorly defined.
 
 blast99 <- filter(blast_filt_dedup.df, 
-       pident >= 99, 
-       qcovhsp >= 99, 
-       (send - sstart- mismatch + 1)/slen >= .99) %>% 
+                  pident >= 99, 
+                  qcovhsp >= 99, 
+                  (send - sstart- mismatch + 1)/slen >= .99) %>% 
   select(qseqid, sseqid)
 
 blast99.df <- bind_rows(blast99, rename(blast99, qseqid = sseqid, sseqid = qseqid)) %>% 
@@ -616,8 +616,8 @@ blast99.df <- bind_rows(blast99, rename(blast99, qseqid = sseqid, sseqid = qseqi
             id99_nonref = paste(sseqid[str_detect(sseqid, pattern = 'PVX|PVP01|PVW1', negate = TRUE)], collapse = ',')) 
 
 blast99_denovo.df <- mutate(blast99.df,
-         Name = str_extract(qseqid, pattern = "NonamEV.+t[[:digit:]]{1,2}(?=_)"),
-         assembly = str_extract(qseqid, pattern = "(?<=t[[:digit:]]{1,2}_).+")) %>%
+                            Name = str_extract(qseqid, pattern = "NonamEV.+t[[:digit:]]{1,2}(?=_)"),
+                            assembly = str_extract(qseqid, pattern = "(?<=t[[:digit:]]{1,2}_).+")) %>%
   filter(!is.na(Name)) %>% 
   select(Name, assembly, id99_ref, id99_nonref)
 
@@ -645,7 +645,7 @@ Asexual stages show that better assemblies demonstrate better _de novo pir_ reco
 ```{r assembly_stats}
 
 assembly.df <- unique(select(quant_filtered.df, 
-                                     lifecycle_stage, Complete, num_pir, experiment_id))
+                             lifecycle_stage, Complete, num_pir, experiment_id))
 # Keep the same axes for both graphs
 y_max <- max(assembly.df$num_pir)
 
@@ -791,21 +791,21 @@ assigned_subfam_prop.mat$new_subfam_uniq <- NULL
 assigned_subfam_prop.mat[is.na(assigned_subfam_prop.mat)] <- 0
 # max_col <- max(na.omit(assigned_subfam_prop.mat))
 (spec_ht <- Heatmap(t(assigned_subfam_prop.mat[1:26,]), 
-        na_col = 'white',
-        # cluster_rows = FALSE,
-        # cluster_columns = FALSE,
-        row_split = 4,
-        # column_split = 3,
-        row_names_gp = gpar(fontsize = 12),
-        column_names_gp = gpar(fontsize = 14),
-        column_names_rot = 55,
-        col = circlize::colorRamp2(c(0,0.0001,
-                                     max(assigned_subfam_prop.mat)/8,
-                                     max(assigned_subfam_prop.mat)),
-                                   c('white',viridis::cividis(3))),
-        heatmap_legend_param  = list(title_gp = gpar(fontsize = 14)),
-        name = 'Proportion of\n pir numbers\n',
-        ) )
+                    na_col = 'white',
+                    # cluster_rows = FALSE,
+                    # cluster_columns = FALSE,
+                    row_split = 4,
+                    # column_split = 3,
+                    row_names_gp = gpar(fontsize = 12),
+                    column_names_gp = gpar(fontsize = 14),
+                    column_names_rot = 55,
+                    col = circlize::colorRamp2(c(0,0.0001,
+                                                 max(assigned_subfam_prop.mat)/8,
+                                                 max(assigned_subfam_prop.mat)),
+                                               c('white',viridis::cividis(3))),
+                    heatmap_legend_param  = list(title_gp = gpar(fontsize = 14)),
+                    name = 'Proportion of\n pir numbers\n',
+) )
 
 pdf("../../plots/Fig5_vvx_Subfam-Propheatmap_Species.pdf", width = 8, height = 6)
 draw(spec_ht)
@@ -866,18 +866,18 @@ assigned_subfam_prop.mat$new_subfam_uniq <- NULL
 assigned_subfam_prop.mat[is.na(assigned_subfam_prop.mat)] <- 0
 # max_col <- max(na.omit(assigned_subfam_prop.mat))
 subfam_ht <- Heatmap(t(assigned_subfam_prop.mat)[sort(colnames(assigned_subfam_prop.mat)),], 
-        na_col = 'white',
-        name = 'Prop Sub-fam',
-        # cluster_rows = FALSE,
-        # cluster_columns = FALSE,
-        row_names_gp = gpar(fontsize = 6),
-        column_names_gp = gpar(fontsize = 6),
-        row_split = 2,
-        # column_split = 4,
-        col = circlize::colorRamp2(c(0,0.0001,
-                                     max(assigned_subfam_prop.mat)/4,
-                                     max(assigned_subfam_prop.mat)),
-                                   c('white',viridis::viridis(3))))
+                     na_col = 'white',
+                     name = 'Prop Sub-fam',
+                     # cluster_rows = FALSE,
+                     # cluster_columns = FALSE,
+                     row_names_gp = gpar(fontsize = 6),
+                     column_names_gp = gpar(fontsize = 6),
+                     row_split = 2,
+                     # column_split = 4,
+                     col = circlize::colorRamp2(c(0,0.0001,
+                                                  max(assigned_subfam_prop.mat)/4,
+                                                  max(assigned_subfam_prop.mat)),
+                                                c('white',viridis::viridis(3))))
 
 # How does this correspond with the BUSCO scores?
 
@@ -930,7 +930,7 @@ Once again expression is found across most sub-families for most samples, no mat
 assigned_subfam_tpm.df <- assigned_subfam.df %>% 
   filter(assembly == 'Meul22_PNG056_vvx' | Complete >= 50
          # ,str_detect(new_subfam_uniq, pattern = 'E|I')
-         ) %>% 
+  ) %>% 
   select(expt, helpful_id, assembly_id, I1.4, new_subfam_uniq, Complete, TPM_med)
 
 assigned_subfam_tpm_prop.df <- group_by(assigned_subfam_tpm.df, 
@@ -953,18 +953,18 @@ assigned_subfam_tpm_prop.mat[is.na(assigned_subfam_tpm_prop.mat)] <- 0
 
 # max_col <- max(na.omit(assigned_subfam_prop.mat))
 tpm_ht <- Heatmap(t(assigned_subfam_tpm_prop.mat)[sort(colnames(assigned_subfam_tpm_prop.mat)),], 
-        na_col = 'white',
-        name = 'Prop TPM',
-        # cluster_rows = FALSE,
-        # cluster_columns = FALSE,
-        row_names_gp = gpar(fontsize = 6),
-        column_names_gp = gpar(fontsize = 6),
-        row_split = 4,
-        # column_split = 4,
-        col = circlize::colorRamp2(c(0,0.0001,
-                                     max(assigned_subfam_tpm_prop.mat)/4,
-                                     max(assigned_subfam_tpm_prop.mat)),
-                                   c('white',viridis::viridis(3))))
+                  na_col = 'white',
+                  name = 'Prop TPM',
+                  # cluster_rows = FALSE,
+                  # cluster_columns = FALSE,
+                  row_names_gp = gpar(fontsize = 6),
+                  column_names_gp = gpar(fontsize = 6),
+                  row_split = 4,
+                  # column_split = 4,
+                  col = circlize::colorRamp2(c(0,0.0001,
+                                               max(assigned_subfam_tpm_prop.mat)/4,
+                                               max(assigned_subfam_tpm_prop.mat)),
+                                             c('white',viridis::viridis(3))))
 
 pdf("../../plots/vvx_Subfam-TPMheatmap_orderCluster.pdf", width = 7, height = 5)
 draw(tpm_ht + busco_ht + country_ht)
@@ -978,38 +978,38 @@ country_order <- names(country.mat[sort(country.mat, index.return = TRUE)$ix,])
 fonts <- 8
 
 tpm_country_ht <- Heatmap(t(assigned_subfam_tpm_prop.mat)[country_order,], 
-        na_col = 'white',
-        name = 'Prop TPM',
-        cluster_rows = FALSE,
-        # cluster_columns = FALSE,
-        # row_names_gp = gpar(fontsize = fonts),
-        column_names_gp = gpar(fontsize = fonts),
-        row_split = substr(str_replace(country.mat[sort(country.mat, 
-                                                        index.return = TRUE)$ix], 
-                                       pattern = 'ElSalv', 
-                                       replacement = 'ElSv'), 1,4),
-        row_title_rot = 0,
-        # column_split = 4,
-        col = circlize::colorRamp2(c(0,0.0001,
-                                     max(assigned_subfam_tpm_prop.mat)/4,
-                                     max(assigned_subfam_tpm_prop.mat)),
-                                   c('white',viridis::viridis(3))))
+                          na_col = 'white',
+                          name = 'Prop TPM',
+                          cluster_rows = FALSE,
+                          # cluster_columns = FALSE,
+                          # row_names_gp = gpar(fontsize = fonts),
+                          column_names_gp = gpar(fontsize = fonts),
+                          row_split = substr(str_replace(country.mat[sort(country.mat, 
+                                                                          index.return = TRUE)$ix], 
+                                                         pattern = 'ElSalv', 
+                                                         replacement = 'ElSv'), 1,4),
+                          row_title_rot = 0,
+                          # column_split = 4,
+                          col = circlize::colorRamp2(c(0,0.0001,
+                                                       max(assigned_subfam_tpm_prop.mat)/4,
+                                                       max(assigned_subfam_tpm_prop.mat)),
+                                                     c('white',viridis::viridis(3))))
 
 busco_country_ht <- Heatmap(busco.mat[country_order,],
-                    name = 'BUSCO',
-                    cluster_rows = FALSE,
-                    cluster_columns = FALSE,
-                    show_column_names = FALSE,
-                    col = circlize::colorRamp2(c(min(busco.mat),
-                                                 (max(busco.mat) + min(busco.mat))/2,
-                                                 max(busco.mat)),
-                                               c(viridis::magma(3))))
+                            name = 'BUSCO',
+                            cluster_rows = FALSE,
+                            cluster_columns = FALSE,
+                            show_column_names = FALSE,
+                            col = circlize::colorRamp2(c(min(busco.mat),
+                                                         (max(busco.mat) + min(busco.mat))/2,
+                                                         max(busco.mat)),
+                                                       c(viridis::magma(3))))
 
 country_country_ht <- Heatmap(country.mat[country_order,],
-                      name = 'Source',
-                      row_names_gp = gpar(fontsize = fonts),
-                    show_column_names = FALSE,
-                      col = c('black', 'blue', 'yellow', 'red', 'grey', 'hotpink')[1:length(unique(country.mat))])
+                              name = 'Source',
+                              row_names_gp = gpar(fontsize = fonts),
+                              show_column_names = FALSE,
+                              col = c('black', 'blue', 'yellow', 'red', 'grey', 'hotpink')[1:length(unique(country.mat))])
 
 pdf("../../plots/vvx_Subfam-TPMheatmap_orderCountry.pdf", width = 7, height = 5)
 draw(tpm_country_ht + busco_country_ht + country_country_ht)
@@ -1020,33 +1020,33 @@ dev.off()
 busco_order <- rev(names(busco.mat[sort(busco.mat, index.return = TRUE)$ix,]))
 
 tpm_busco_ht <- Heatmap(t(assigned_subfam_tpm_prop.mat)[busco_order,], 
-        na_col = 'white',
-        name = 'Prop TPM',
-        cluster_rows = FALSE,
-        # cluster_columns = FALSE,
-        row_names_gp = gpar(fontsize = 6),
-        column_names_gp = gpar(fontsize = 6),
-        # column_split = 4,
-        col = circlize::colorRamp2(c(0,0.0001,
-                                     max(assigned_subfam_tpm_prop.mat)/4,
-                                     max(assigned_subfam_tpm_prop.mat)),
-                                   c('white',viridis::viridis(3))))
+                        na_col = 'white',
+                        name = 'Prop TPM',
+                        cluster_rows = FALSE,
+                        # cluster_columns = FALSE,
+                        row_names_gp = gpar(fontsize = 6),
+                        column_names_gp = gpar(fontsize = 6),
+                        # column_split = 4,
+                        col = circlize::colorRamp2(c(0,0.0001,
+                                                     max(assigned_subfam_tpm_prop.mat)/4,
+                                                     max(assigned_subfam_tpm_prop.mat)),
+                                                   c('white',viridis::viridis(3))))
 
 busco_busco_ht <- Heatmap(busco.mat[busco_order,],
-                    name = 'BUSCO',
-                    cluster_rows = FALSE,
-                    cluster_columns = FALSE,
-                    show_column_names = FALSE,
-                    col = circlize::colorRamp2(c(min(busco.mat),
-                                                 (max(busco.mat) + min(busco.mat))/2,
-                                                 max(busco.mat)),
-                                               c(viridis::magma(3))))
+                          name = 'BUSCO',
+                          cluster_rows = FALSE,
+                          cluster_columns = FALSE,
+                          show_column_names = FALSE,
+                          col = circlize::colorRamp2(c(min(busco.mat),
+                                                       (max(busco.mat) + min(busco.mat))/2,
+                                                       max(busco.mat)),
+                                                     c(viridis::magma(3))))
 
 country_busco_ht <- Heatmap(country.mat[busco_order,],
-                      name = 'Source',
-                      row_names_gp = gpar(fontsize = 6),
-                      column_names_gp = gpar(fontsize = 6),
-                      col = c('black', 'blue', 'yellow', 'red', 'grey', 'hotpink')[1:length(unique(country.mat))])
+                            name = 'Source',
+                            row_names_gp = gpar(fontsize = 6),
+                            column_names_gp = gpar(fontsize = 6),
+                            col = c('black', 'blue', 'yellow', 'red', 'grey', 'hotpink')[1:length(unique(country.mat))])
 
 pdf("../../plots/vvx_Subfam-TPMheatmap_orderBUSCO.pdf", width = 7, height = 5)
 draw(tpm_busco_ht + busco_busco_ht + country_busco_ht)
@@ -1084,18 +1084,18 @@ assigned_subfam_prop.mat$new_subfam_uniq <- NULL
 assigned_subfam_prop.mat[is.na(assigned_subfam_prop.mat)] <- 0
 # max_col <- max(na.omit(assigned_subfam_prop.mat))
 subfam_ht <- Heatmap(t(assigned_subfam_prop.mat)[sort(colnames(assigned_subfam_prop.mat)),], 
-        na_col = 'white',
-        name = 'Prop Sub-fam',
-        # cluster_rows = FALSE,
-        # cluster_columns = FALSE,
-        row_names_gp = gpar(fontsize = 6),
-        column_names_gp = gpar(fontsize = 6),
-        # row_split = 2,
-        # column_split = 4,
-        col = circlize::colorRamp2(c(0,0.0001,
-                                     max(assigned_subfam_prop.mat)/4,
-                                     max(assigned_subfam_prop.mat)),
-                                   c('white',viridis::viridis(3))))
+                     na_col = 'white',
+                     name = 'Prop Sub-fam',
+                     # cluster_rows = FALSE,
+                     # cluster_columns = FALSE,
+                     row_names_gp = gpar(fontsize = 6),
+                     column_names_gp = gpar(fontsize = 6),
+                     # row_split = 2,
+                     # column_split = 4,
+                     col = circlize::colorRamp2(c(0,0.0001,
+                                                  max(assigned_subfam_prop.mat)/4,
+                                                  max(assigned_subfam_prop.mat)),
+                                                c('white',viridis::viridis(3))))
 
 pdf("../../plots/vvx_Subfam-TPMheatmap_Country.pdf", width = 7, height = 5)
 draw(subfam_ht)
