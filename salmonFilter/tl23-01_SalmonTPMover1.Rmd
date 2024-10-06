@@ -877,7 +877,7 @@ subfam_ht <- Heatmap(t(assigned_subfam_prop.mat)[sort(colnames(assigned_subfam_p
                      col = circlize::colorRamp2(c(0,0.0001,
                                                   max(assigned_subfam_prop.mat)/4,
                                                   max(assigned_subfam_prop.mat)),
-                                                c('white',viridis::viridis(3))))
+                                                c('white',viridis::cividis(3))))
 
 # How does this correspond with the BUSCO scores?
 
@@ -911,7 +911,7 @@ country_ht <- Heatmap(country.mat,
                       column_names_gp = gpar(fontsize = 6),
                       col = c('black', 'blue', 'yellow', 'red', 'grey', 'hotpink')[1:length(unique(country.mat))])
 
-pdf("../../plots/vvx_Subfam-Propheatmap_orderCluster.pdf", width = 7, height = 5)
+pdf("../../plots/SuppFig_vvx_Subfam-Propheatmap_orderCluster.pdf", width = 7, height = 5)
 draw(subfam_ht + busco_ht + country_ht)
 dev.off()
 # biplot(princomp(t(assigned_subfam_prop.mat), scale = TRUE, center = TRUE))
@@ -957,16 +957,38 @@ tpm_ht <- Heatmap(t(assigned_subfam_tpm_prop.mat)[sort(colnames(assigned_subfam_
                   name = 'Prop TPM',
                   # cluster_rows = FALSE,
                   # cluster_columns = FALSE,
-                  row_names_gp = gpar(fontsize = 6),
-                  column_names_gp = gpar(fontsize = 6),
+                  column_names_gp = gpar(fontsize = 14),
+                  column_names_rot = 55,
                   row_split = 4,
+                  heatmap_legend_param  = list(title_gp = gpar(fontsize = 12)),
                   # column_split = 4,
                   col = circlize::colorRamp2(c(0,0.0001,
                                                max(assigned_subfam_tpm_prop.mat)/4,
                                                max(assigned_subfam_tpm_prop.mat)),
                                              c('white',viridis::viridis(3))))
 
-pdf("../../plots/vvx_Subfam-TPMheatmap_orderCluster.pdf", width = 7, height = 5)
+# Note that the busco.mat and country.mat are defined a couple of chunks above.
+#  I re-define busco_ht and country_ht here to alter font sizes and remove the row names.
+
+busco_ht <- Heatmap(busco.mat[sort(rownames(busco.mat)),],
+                    name = 'BUSCO',
+                    cluster_rows = FALSE,
+                    cluster_columns = FALSE,
+                    show_column_names = FALSE,
+                    heatmap_legend_param  = list(title_gp = gpar(fontsize = 12)),
+                    col = circlize::colorRamp2(c(min(busco.mat),
+                                                 (max(busco.mat) + min(busco.mat))/2,
+                                                 max(busco.mat)),
+                                               c(viridis::magma(3))))
+
+country_ht <- Heatmap(country.mat,
+                      name = 'Source',
+                      row_names_gp = gpar(fontsize = 0),
+                      column_names_gp = gpar(fontsize = 6),
+                      heatmap_legend_param  = list(title_gp = gpar(fontsize = 12)),
+                      col = c('black', 'blue', 'yellow', 'red', 'grey', 'hotpink')[1:length(unique(country.mat))])
+
+pdf("../../plots/Fig6_vvx_Subfam-TPMheatmap_orderCluster.pdf", width = 7, height = 6)
 draw(tpm_ht + busco_ht + country_ht)
 dev.off()
 ```
