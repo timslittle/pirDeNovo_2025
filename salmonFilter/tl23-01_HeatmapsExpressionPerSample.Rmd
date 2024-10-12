@@ -29,7 +29,7 @@ library('ComplexHeatmap')
 
 safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
                              "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888")
-global_save_var <- TRUE
+global_save_var <- FALSE
 ```
 
 ```{r import_functions}
@@ -103,7 +103,9 @@ quant_subfam.df <- left_join(quant_filtered.df,
 
 # Filter for the genes with ooc/ook/gametes mentioned and NA (the pir genes, these don't match a BUSCO) 
 quant_subfam.df <- filter(quant_subfam.df, 
-                          grepl(Description.y, pattern = regex('oocyst|ookinete|gamete', ignore_case = TRUE)) | is.na(Description.y) ) %>% 
+                          grepl(Description.y, 
+                                pattern = regex('oocyst|ookinete|gamete', 
+                                                ignore_case = TRUE)) | is.na(Description.y) ) %>% 
   #Filter out the 18h-Inf samples as they're weird.
   filter(helpful_sample_name != '18h-inf')
 
@@ -120,7 +122,7 @@ ordering_vector <- c('before','after','1h', '6h','12h','18h','22h','24h','26h','
 quant_subfam_buscoFifty.df <- filter(quant_subfam_buscoFifty.df,
                                      !grepl(helpful_sample_name, pattern = 'ctrl'))
 
-lapply(unique(quant_subfam_buscoFifty.df$experiment_id), 
+lapply(unique(quant_subfam_buscoFifty.df$experiment_id)[1], 
        function(expt.id){
          
          # print(expt.id)
@@ -145,38 +147,22 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id),
                                             value.var = 'TPM') %>% 
                     arrange(desc(TPM_med)) %>% 
                     #Use factors here to order by the largest TPM_median sub-families.
+                    # Here is also when the rownames are defined for the heatmap.
                     mutate(new_subfam_uniq = factor(new_subfam_uniq, levels = unique(new_subfam_uniq)),
                            rownames = case_when(label %in% ancestral_genes_denovo ~ 'anc',
                                                 str_detect(id99_ref, pattern = 'P') ~ id99_ref,
                                                 !is.na(Description.y) ~ Description.y)) %>% 
                     arrange(new_subfam_uniq, desc(TPM_med))
                   
-                  #Only show the relevant 'ref' genes for comparison
-                  if(grepl(expt.id, pattern = 'Mosq')){
-                    tpm.df <- filter(tpm.df, 
-                                     new_subfam_uniq != 'ref' | grepl(rownames, 
-                                                                      ignore.case = TRUE, 
-                                                                      pattern = 'Gam|Ook|Ooc|Malate|Ribonucleoside-diphosphate'))
-                  }
-                  
                   tpm_pir.index <- tpm.df$new_subfam_uniq != 'ref'
-                  tpm_ref.index <- tpm.df$new_subfam_uniq == 'ref'
                   
-                  tpm.mat <- as.matrix(select(tpm.df, -Name, -new_subfam_uniq, -TPM_med, -id99_ref, -rownames, -label, -Description.y))
+                  tpm.mat <- as.matrix(select(tpm.df, -Name, -new_subfam_uniq, 
+                                              -TPM_med, -id99_ref, -rownames, 
+                                              -label, -Description.y))
                   rownames(tpm.mat) <- ifelse(is.na(tpm.df$rownames), '', tpm.df$rownames)
                   tpm.mat <- tpm.mat[,ordering(colnames(tpm.mat), order_vector = ordering_vector), drop = FALSE]
                   
                   tpm_pir.mat <- tpm.mat[tpm_pir.index,]
-                  tpm_ref.mat <- tpm.mat[tpm_ref.index,]
-                  tpm_ref.filter <- 10
-                  
-                  if(is.null(dim(tpm_ref.mat))) {
-                    # Only 1D vector.
-                    tpm_ref.mat <- tpm_ref.mat[tpm_ref.mat > tpm_ref.filter]
-                  }
-                  else if(length(tpm_ref.mat) >= 1){
-                    tpm_ref.mat <- tpm_ref.mat[apply(tpm_ref.mat,1,sum) > tpm_ref.filter,]
-                  }
                   
                   subfam.mat <- as.matrix(select(tpm.df, new_subfam_uniq))[tpm_pir.index,]
                   
@@ -202,38 +188,13 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id),
                                                                  viridis::viridis(4)))
                   )
                   
-                  if(length(tpm_ref.mat) >= 1){
-                    tmp_ref.max <- plyr::round_any(max(tpm_ref.mat), 100, f = ceiling)
-                    ref.ht <- Heatmap(tpm_ref.mat, 
-                                      cluster_rows = FALSE, 
-                                      cluster_columns = FALSE,
-                                      column_names_gp = gpar(fontsize = 7),
-                                      row_title_rot = 0,
-                                      show_row_names = TRUE,
-                                      show_heatmap_legend = TRUE,
-                                      name = 'TPM ref genes',
-                                      column_title = assm.id,
-                                      border = TRUE,
-                                      row_names_gp = gpar(fontsize = 5),
-                                      col = circlize::colorRamp2(c(0, 
-                                                                   tmp_ref.max/4,
-                                                                   tmp_ref.max/2,
-                                                                   tmp_ref.max*3/4,
-                                                                   tmp_ref.max),
-                                                                 c('white', rev(viridis::magma(4))))
-                    )
-                    if(global_save_var){
-                      pdf(paste0('../../plots/vvx_TPMheatmap_', expt.id, '_', assm.id, '.pdf'),
-                          width = 7, height = 4)
-                    }
-                    draw(pir.ht %v% ref.ht)
-                    dev.off()
-                    return(pir.ht %v% ref.ht)
-                  } else {
-                    return(pir.ht)
+                  if(global_save_var){
+                    pdf(paste0('../../plots/vvx_TPMheatmap_', expt.id, '_', assm.id, '.pdf'),
+                        width = 7, height = 4)
                   }
-                  
-                  return()
+                  draw(pir.ht)
+                  if(global_save_var){dev.off()}
+                  return(pir.ht)
                 })
        })
 ```
