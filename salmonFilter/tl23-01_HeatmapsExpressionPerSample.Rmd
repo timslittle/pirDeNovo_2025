@@ -88,8 +88,10 @@ To reduce the sizes of the heatmaps to informative levels I used a further thres
 #Combine the relevant data, note that for the non-pir genes included for the heatmaps many of these will be NA.
 quant_subfam.df <- left_join(quant_filtered.df, 
                              select(assigned_subfam.df, 
-                                    c('label', 'Name', 'hmmer_path', "TPM_med", "TPM_max", "TPM_min", "NumReads_med", "NumReads_max", 
-                                      "NumReads_min", "I1.4", "new_subfam", "new_subfam_uniq"
+                                    c('label', 'Name', 'hmmer_path', 
+                                      "TPM_med", "TPM_max", "TPM_min", 
+                                      "NumReads_med", "NumReads_max", "NumReads_min", 
+                                      "I1.4", "new_subfam", "new_subfam_uniq"
                                       # "expt", "Input_file", "Dataset", "Complete", "Single", "Duplicated",  "num_pir", "num_transcripts",
                                       # "Fragmented", "Missing", "n_markers", "lifecycle_stage", "location", 
                                       # "experiment_id", "new_subfam_uniq", "assembly_id"
