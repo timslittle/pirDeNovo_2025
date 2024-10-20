@@ -107,7 +107,11 @@ quant_subfam.df <- filter(quant_subfam.df,
                                 pattern = regex('oocyst|ookinete|gamete', 
                                                 ignore_case = TRUE)) | is.na(Description.y) ) %>% 
   #Filter out the 18h-Inf samples as they're weird.
-  filter(helpful_sample_name != '18h-inf')
+  filter(helpful_sample_name != '18h-inf') %>% 
+  #Remove the '-inf' for clearer names
+  mutate(helpful_sample_name = str_replace(helpful_sample_name, 
+                                           pattern = '-inf',
+                                           replacement = ''))
 
 quant_subfam.df$new_subfam_uniq[is.na(quant_subfam.df$new_subfam_uniq)] <- 'ref'
 
@@ -122,7 +126,7 @@ ordering_vector <- c('before','after','1h', '6h','12h','18h','22h','24h','26h','
 quant_subfam_buscoFifty.df <- filter(quant_subfam_buscoFifty.df,
                                      !grepl(helpful_sample_name, pattern = 'ctrl'))
 
-lapply(unique(quant_subfam_buscoFifty.df$experiment_id)[1], 
+lapply(unique(quant_subfam_buscoFifty.df$experiment_id), 
        function(expt.id){
          
          # print(expt.id)
@@ -134,13 +138,17 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id)[1],
                 function(assm.id){
                   # print(assm.id)
                   assm.df <- expt.df[expt.df$assembly_id == assm.id,] 
+                  
+                  ## Commenting out the filter for now
                   # Filter pirs by one tenth of max value, unless this is lower than one.
-                  tpm_pir_max_filter <- ifelse(max(assm.df$TPM[!is.na(assm.df$E.value_fullseq)]) > 10,
-                                               round(max(assm.df$TPM[!is.na(assm.df$E.value_fullseq)])/10),
-                                               1)
-                  #Filter by max_TPM but include na values (as these are the non-pir reference genes).
-                  assm.df <-  filter(assm.df, TPM_max >= tpm_pir_max_filter | is.na(TPM_max))
+                  # tpm_pir_max_filter <- ifelse(max(assm.df$TPM[!is.na(assm.df$E.value_fullseq)]) > 10,
+                  #                              round(max(assm.df$TPM[!is.na(assm.df$E.value_fullseq)])/10),
+                  #                              1)
+                  # #Filter by max_TPM but include na values (as these are the non-pir reference genes).
+                  # assm.df <-  filter(assm.df, TPM_max >= tpm_pir_max_filter | is.na(TPM_max))
+                  
                   if(nrow(assm.df) == 0) {return(NULL)}
+                  
                   # reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med ~ sample + helpful_sample_name, value.var = 'TPM') 
                   tpm.df <- reshape2::dcast(assm.df, 
                                             Name + label + new_subfam_uniq + TPM_med + id99_ref + Description.y ~ helpful_sample_name, 
@@ -150,7 +158,10 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id)[1],
                     # Here is also when the rownames are defined for the heatmap.
                     mutate(new_subfam_uniq = factor(new_subfam_uniq, levels = unique(new_subfam_uniq)),
                            rownames = case_when(label %in% ancestral_genes_denovo ~ 'anc',
-                                                str_detect(id99_ref, pattern = 'P') ~ id99_ref,
+                                                # str_detect(id99_ref, 
+                                                #            pattern = 'P') ~ str_replace_all(id99_ref,
+                                                #                                             pattern = ',',
+                                                #                                             replacement = ', '),
                                                 !is.na(Description.y) ~ Description.y)) %>% 
                     arrange(new_subfam_uniq, desc(TPM_med))
                   
@@ -166,30 +177,36 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id)[1],
                   
                   subfam.mat <- as.matrix(select(tpm.df, new_subfam_uniq))[tpm_pir.index,]
                   
-                  tmp_pir.max <- plyr::round_any(max(tpm_pir.mat), 10, f = ceiling)
+                  tmp_pir.max <- plyr::round_any(max(tpm_pir.mat), 
+                                                 5, 
+                                                 f = ceiling)
                   pir.ht <- Heatmap(tpm_pir.mat, 
                                     cluster_rows = FALSE, 
                                     cluster_columns = FALSE,
-                                    column_names_gp = gpar(fontsize = 7),
+                                    row_title_gp = gpar(fontsize = ifelse(length(unique(subfam.mat)) > 9,
+                                                                          8,
+                                                                          12)),
                                     row_split = factor(c(subfam.mat), levels = unique(subfam.mat)),
                                     row_title_rot = 0,
-                                    row_title_gp = gpar(fontsize = 7),
+                                    row_names_gp = gpar(fontsize = 8),
                                     show_row_names = TRUE,
+                                    column_names_gp = gpar(fontsize = 12),
+                                    column_names_rot = 45,
                                     name = 'TPM pir',
                                     column_title = assm.id,
+                                    row_gap = unit(2, "mm"),
                                     border = TRUE,
-                                    row_names_gp = gpar(fontsize = 5),
                                     col = circlize::colorRamp2(c(0, 
                                                                  tmp_pir.max/4,
                                                                  tmp_pir.max/2,
                                                                  tmp_pir.max*3/4,
                                                                  tmp_pir.max),
                                                                c('white',
-                                                                 viridis::viridis(4)))
+                                                                 viridis::viridis(5)[2:5]))
                   )
                   
                   if(global_save_var){
-                    pdf(paste0('../../plots/vvx_TPMheatmap_', expt.id, '_', assm.id, '.pdf'),
+                    pdf(paste0('../../plots/Figs_vvx_TPMheatmap_', expt.id, '_', assm.id, '.pdf'),
                         width = 7, height = 4)
                   }
                   draw(pir.ht)
