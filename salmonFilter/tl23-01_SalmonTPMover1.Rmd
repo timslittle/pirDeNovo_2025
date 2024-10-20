@@ -672,12 +672,14 @@ lapply(c('mosquito','asexual'), function(stages){
            shape = guide_legend(ncol = 1, 
                                 title = 'Lifecycle stage', 
                                 byrow = TRUE)) +
-    theme(legend.text = element_text(size = 10),
+    theme(legend.text = element_text(size = 15),
           legend.key.size = unit(.5,"cm"),
           legend.spacing.y = unit(.25, 'cm'),
-          text = element_text(size = 20))
+          text = element_text(size = 17))
   ggsave(paste0('../../plots/Fig2_vivax_BUSCOvNumPir_', stages,'.pdf'),
-         busco.plot)
+         busco.plot,
+         width = unit(10, "in"),
+         height = unit(6, "in"))
   busco.plot
 })
 
