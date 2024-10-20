@@ -518,10 +518,11 @@ breaks_y <- seq(0, plyr::round_any(max_y, 5, ceiling), 5)
                        # limits = c(0, max(breaks_y))
     ) +
     theme_classic()+
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) )
+    theme(axis.text.x = element_text(angle = 75, vjust = 0.47)) )
 
 ggsave('../../plots/Fig3_vivax_subfamDisI14Network.pdf',
        height = 5,
+       width = 10,
        subfam_graph.plot)
 
 ```
