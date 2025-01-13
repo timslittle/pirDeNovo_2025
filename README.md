@@ -1,0 +1,1 @@
+Code accompanying the publication "De novo assembly of plasmodium interspersed repeat (pir) genes from Plasmodium vivax RNAseq data suggests geographic conservation of sub-family transcription" by Timothy S Little et al. 
