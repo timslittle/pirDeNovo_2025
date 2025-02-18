@@ -45,6 +45,8 @@ library('ComplexHeatmap')
 
 safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
                              "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888")
+
+#Set global_save_var as TRUE to save plots.
 global_save_var <- FALSE
 ```
 
@@ -54,11 +56,13 @@ source('../rfunctions/uniquify_fun.R')
 source('../rfunctions/ordering_fun.R')
 ```
 
-```{r load_salmon}
+```{r load_salmon_quant_files}
+#Experimental assembly names (the old ones that I was using during analysis)
 # experiment.vec <- c('Bourgard21')
 experiment.vec <- c('Bourgard21', 'Imp22', 'K19', 'Meul22',
                     'R20', 'S20-Z16', 'B20-C19-G19-G18-M19-K17')
 
+#Replace the path names after 'ls' with the pathnames to the salmon quant file outputs.
 quant.files <- c(
   system("ls ../../nextflow/vvx_*/salmon/*/quant.sf", 
          intern = TRUE),
