@@ -13,7 +13,7 @@ output:
 
 # Intro
 
-This script filters the _de novo_ transcripts from _P. vivax_ for those that match _pir_s (HMM coverage > 75%), and are expressed (Both TPM and Number of Reads greater than 1 in at least one sample).
+This script takes the filtered _de novo_ transcripts from _P. vivax_ (filtered for transcripts that match _pir_s (HMM coverage > 75%), and are expressed (Both TPM and Number of Reads greater than 1 in at least one sample).
 
 Different experiments are denoted by an experiment code of the following structure: 
 * (Lifecycle stage)(Geographical Source)(Year of publication).
@@ -57,167 +57,11 @@ source('../rfunctions/ordering_fun.R')
 ```
 
 ```{r load_salmon_quant_files}
-#Experimental assembly names (the old ones that I was using during analysis)
-# experiment.vec <- c('Bourgard21')
-experiment.vec <- c('Bourgard21', 'Imp22', 'K19', 'Meul22',
-                    'R20', 'S20-Z16', 'B20-C19-G19-G18-M19-K17')
-
-#Replace the path names after 'ls' with the pathnames to the salmon quant file outputs.
-quant.files <- c(
-  system("ls ../../nextflow/vvx_*/salmon/*/quant.sf", 
-         intern = TRUE),
-  system("ls ../../salmon_manual/quant/*/quant.sf", 
-         intern = TRUE)
-)
-
-assemblies.list <- str_extract(quant.files, pattern = '(?<=_vvx_T[[:digit:]]{1,2}_).+(?=/quant.sf)') %>% unique
-
-# Load in the quant.sf data by lapply-ing across the experiment/Nextflow analysis names above.
-# 
-# quant.list <- lapply(assemblies.list,
-#                    function(assembly.nam){
-#                      print(paste0("Doing ", assembly.nam))
-# 
-#                      # Mistake: Some results files from earlier pipeline outputs helpfully don't follow the same nomenclature:
-#                      # e.g. Kim17_SRX5158495_SRR8347532_vvx.txt.gz (old) Kim17_SRX5158495-SRR8347532_vvx.txt.gz (new) - note the '_' and '-'.
-#                      # pattern = '(SRX|ERX).+_(SRR|ERR).+(?=_vvx)'
-# 
-#                      # Which folder are the non-Salmon results in?
-# 
-#                      # tryCatch(system2(paste0("ls ../../nextflow/vvx_*/hmmer/", assembly.nam, ".txt.gz")),
-#                      #          error = function(err) {
-#                      #            system(paste0("ls ../../nextflow/*/vvx_*/hmmer/", assembly.nam, ".txt.gz"),
-#                      #                   intern = TRUE)
-#                      #          })
-# 
-#                      #Fasta file
-# 
-#                      fasta.path <- system(paste0("ls ../../nextflow/vvx_*/evigene/okayset/", assembly.nam, ".okay.aa"),
-#                             intern = TRUE)
-# 
-#                      stopifnot(length(fasta.path) == 1)
-# 
-#                      #HMMer results - requires a decent amount of processing - put into a function.
-#                      hmmer_gz.path <- system(paste0("ls ../../nextflow/vvx_*/hmmer/", assembly.nam, ".txt.gz"),
-#                             intern = TRUE)
-# 
-#                      stopifnot(length(hmmer_gz.path) == 1)
-# 
-#                      if(!any(grepl(readLines(hmmer_gz.path),
-#                                    pattern = 'No targets detected that satisfy reporting thresholds'))){
-#                        hmmer_gz.df <- read_HMMertxtgz(hmmer_gz.path) %>%
-#                          mutate(Name = Sequence)
-#                      } else {
-#                        #Create an empty data.frame when there are no HMMer matches
-#                        hmmer_gz.df <- setNames(data.frame(matrix(ncol = 11, nrow = 1)),
-#                                                c("E-value_fullseq", "score_fullseq", "bias_fullseq", "E-value_bestdom",
-#                                                  "score_bestdom", "bias_bestdom", "exp_numdom", "N_numdom", "Sequence",
-#                                                  "Description", "Name"))
-#                      }
-# 
-#                      #BUSCO results - once again have to take account of my silly file organisation and using different naming conventions.
-# 
-#                      busco_assembly_name <- str_replace(str_replace(assembly.nam,
-#                                                                     pattern = '-',
-#                                                                     replacement = '_'),
-#                                                         pattern = 'Kim19_Isolate',
-#                                                         replacement = 'Kim19_Isolate_')
-# 
-#                      if(length(system(paste0("ls ../../nextflow/multiassembly_evigene_results/*/busco/*/",
-#                                              busco_assembly_name,
-#                                              '.okay.aa/run_plasmodium_odb10/full_table.tsv'), intern = TRUE)) > 0) {
-#                        busco.df <- read_tsv(system(paste0("ls ../../nextflow/multiassembly_evigene_results/*/busco/*/",
-#                                                           busco_assembly_name,
-#                                                           '.okay.aa/run_plasmodium_odb10/full_table.tsv'),
-#                                                    intern = TRUE),
-#                                             skip = 2)
-#                      } else {
-#                        busco.df <- read_tsv(system(paste0("ls ../../nextflow/vvx_*/busco/",
-#                                                           assembly.nam,
-#                                                           "*/",
-#                                                           assembly.nam,
-#                                                           ".okay.aa/run_plasmodium_odb10/full_table.tsv"),
-#                                                    intern = TRUE), skip = 2)
-#                      }
-# 
-#                      busco.df <- mutate(busco.df, Name = Sequence) %>%
-#                          mutate(across(everything(), as.character))
-# 
-#                      # Get the quant files for this assembly
-#                      assembly_quant.files <- str_subset(quant.files,
-#                                                         pattern = assembly.nam)
-# 
-#                      # For each quant file do:
-# 
-#                      lapply(assembly_quant.files, function(qnt){
-#                        # Get the samples mapped in these quant files
-# 
-#                        sample.nam <- str_extract(qnt,
-#                                                  pattern = '(?<=(salmon|quant)/).+_vvx_T[[:digit:]]{1,2}(?=_.+/quant.sf)')
-# 
-#                        #Read in the qnt file and add information, including whether the transcripts is a hmmer match.
-#                        read.delim(qnt) %>%
-#                          mutate(source = str_extract(qnt, '(?<=/(salmon|quant)/).+(?=/quant.sf)'),
-#                                 sample =  sample.nam,
-#                                 assembly = assembly.nam,
-#                                 file_source = qnt,
-#                                 # results_path = results.path,
-#                                 hmmer_path = hmmer_gz.path,
-#                                 fasta_path = fasta.path)
-#                      }) %>%
-#                        bind_rows %>%
-#                        # Combine with the HMMer and BUSCO
-#                        left_join(hmmer_gz.df, by = 'Name') %>%
-#                        left_join(busco.df, by = 'Name')
-#                      })
-# 
-# # data.table::rbindlist(quant.list)
-# 
-# quant.df <- bind_rows(quant.list)
-# 
-# quant.df <- mutate(quant.df, hmm_cvrg_perc = (hmm_cvrg/380)*100) %>%
-#   group_by(assembly,fasta_path) %>%
-#   mutate(num_transcripts = system(paste0('grep ">" ',fasta_path,'| wc -l'), intern = TRUE),
-#          expt = str_extract(assembly, pattern = '^.+(?=_.+_vvx)'))
-# 
-# assembly_busco <- lapply(unique(quant.df$hmmer_path),
-#        function(hmmer.path){
-#          res.path = str_extract(hmmer.path, pattern = '.+vvx_.+(?=/hmmer)')
-#          assembly.nam = unique(quant.df$assembly[quant.df$hmmer_path == hmmer.path])
-#          busco.df = read.table(paste0(res.path,
-#                                       '/busco/',
-#                                       assembly.nam,
-#                                       '-plasmodium_odb10-busco.batch_summary.txt'),
-#                                header = TRUE) %>%
-#            mutate(assembly = assembly.nam)
-#        }) %>% bind_rows %>% arrange(Complete)
-# write_csv(assembly_busco, path = 'busco_all.csv')
-
 # Manually altered the assembly_stats csv file to include life cycle stages and experimental identifiers.
 assembly_stats.df <- read_csv('assembly_stats_lifecycle.csv') %>%
   mutate(helpful_id = paste0(experiment_id, '_', helpful_assembly_name),
          country = str_extract(location, pattern = '(?<=_).+(?=_)')) %>%
   select(assembly, num_pir, lifecycle_stage, location, experiment_id, helpful_assembly_name, helpful_id, country)
-
-# quant.df <- full_join(full_join(quant.df, assembly_busco, by = 'assembly'), assembly_stats.df, by = 'assembly')
-# 
-# write_csv(quant.df, path = 'salmonQuant_all.csv')
-
-#read_csv is faster but may populate an entire column with NA. ?readr::cols
-# quant.df <- read.csv(file = 'salmonQuant_all.csv')
-# quant.df <- read_csv(file = 'salmonQuant_all.csv', col_types = cols(.default = col_character()))
-
-```
-
-```{r assembly_stats}
-
-#QC: Which sample names are NA:
-# filter(quant.df, is.na(sample)) %>% .$source %>% unique
-
-# Test the numbers of assemblies and sample files.
-# str_extract(quant.files, pattern = '(?<=_vvx_T[[:digit:]]{1,2}_).+(?=/quant.sf)') %>% unique %>% str_subset('Imp') %>% length
-# quant.files %>% str_subset('Rangel') %>% length
-
 ```
 
 ```{r quant_filtered}
@@ -257,36 +101,6 @@ quant_filtered.df <- read.csv('salmonQuant_filtered.csv')
 
 ```
 
-# Histogram of HMM % coverage across the _de novo pir_\s
-
-Higher percentage indicates a greater coverage of the input HMM model across the _de novo_ sequence. 100% means the entire model was covered. I chose 75% as a cut-off for this to count as a full _pir_ sequence. I believe this histogram indicates many fragmentary transcripts, either due to incomplete or erroneous assembly, or pseudogenic sequence.
-
-```{r show_hist, fig.show=TRUE}
-
-# hist(`HMM Plasmodium_vir coverage for each sequence`, breaks = 1000, cex.main = 1)
-
-```
-
-```{r fasta}
-# Extract the fasta files of pirs expressed above threshold. 
-
-#Note that this function appends to an existing file so be sure to remove it if it already exists.
-#Save date for file name.
-# date.str <- format(Sys.time(), "%d%b")
-# lapply(unique(quant_filtered.df$fasta_path),
-#        function(fasta.path){
-#          pir_names <- unique(filter(quant_filtered.df, 
-#                                     fasta_path == fasta.path)$Name)
-#          assembly_nam <- unique(filter(quant_filtered.df, 
-#                                        fasta_path == fasta.path)$assembly)
-#          fasta.fa <- read.fasta(fasta.path)
-#          fasta_pir.fa <- fasta.fa[getName(fasta.fa) %in% pir_names]
-#          write.fasta(fasta_pir.fa, names = paste0(getName(fasta_pir.fa), '_', assembly_nam),
-#                      file.out = paste0('../../deNovoPirs/deNovoPirs_',date.str,'.fasta'), open = 'a')
-#        }) 
-```
-
-
 ```{r subfam}
 # Make the node.df file for graph design. Using the concatenated fasta file of the above filtered de novo pirs and reference gene pirs.
 
@@ -325,17 +139,6 @@ subfam.df$subfam[grepl(subfam.df$Name, pattern = 'PVX')] <- sapply(
     }
   })
 
-#Which Lopez sequences are missing from the PlasmoDB search?
-
-# write.table(lopez13_sal1Subfam[!lopez13_sal1Subfam$name %in% subfam.df$Name,]$name,
-#             file = '../../network/lopez13_sal1Subfam_missingPirs.txt',
-#             row.names = FALSE,
-#             col.name = FALSE,
-#             quote = FALSE)
-
-# Test subfam assignment
-# left_join(lopez13_sal1Subfam, mutate(subfam.df, name = Name), by = 'name')
-
 # write_csv(subfam.df,
 #           path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_Sal1subfam.csv')
 ```
@@ -367,10 +170,6 @@ gephi.df <- mutate(subfam.df,
   select(-Name) %>%
   left_join(quant_filtered_sequence.df, by = c('Name_assembly')) %>%
   relocate(Id, label)
-
-#Prev issue: Why are a load of Meul22_Pv032 pirs in subfam.df but not quant_filtered_sequence.df.
-## quant_filtered.df was out-of-date, may have not saved a previous iteration?
-
 ```
 
 # Clustering algorithm
@@ -465,7 +264,7 @@ lapply( str_subset(colnames(gephi_mcl.df), pattern = '^I[[:digit:]]'),
         })
 ```
 
-```{r save_I14}
+```{r Fig3_save_I14}
 infl <- 'I1.4'
 
 subfam_graph.df <- gephi_mcl.df %>% 
@@ -671,6 +470,7 @@ assemblies_overFiftyBUSCO <- assembly.df$assembly[assembly.df$Complete > 50]
 assembly.df[assembly.df$Complete <= 50,] %>% arrange(num_pir)
 
 ```
+
 ```{r new_subfam_names}
 # assigned_subfam.df <- gephi_mcl.df %>%
 #   select(-c(starts_with('I')), I1.4) %>%
@@ -719,7 +519,6 @@ length(unique(quant_filtered_withNewSubfam.df$Name_assembly)) == 6513
 
 # write_csv(quant_filtered_withNewSubfam.df, 'pirLabel_newSubfam_quant.csv')
 ```
-
 
 ## Ancestral _de novo pir_\ s.
 
