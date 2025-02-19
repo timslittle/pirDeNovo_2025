@@ -231,30 +231,61 @@ assembly_stats.df <- read_csv('assembly_stats_lifecycle.csv') %>%
 #   filter(!is.na(hmm_cvrg) & hmm_cvrg_perc >= 75 | Description.y %in% comp_busco_genes)
 
 #Want to include some non-pir genes as identified by BUSCO since these are useful for comparing different life cycle stages present.
-# comp_busco_genes <- c('Secreted ookinete protein, putative',
-#                       'Secreted ookinete adhesive protein, putative',
-#                       '25 kDa ookinete surface antigen, putative',
-#                       '28 kDa ookinete surface protein',
-#                       'Cell traversal protein for ookinetes and sporozoites',
-#                       
-#                       'Male gamete fusion factor HAP2, putative',
-#                       'Gamete egress and sporozoite traversal protein, putative',
-#                       'Gamete release protein, putative',
-#                       'Oocyst capsule protein',
-#                       'Malate dehydrogenase',
-#                       'Ribonucleoside-diphosphate reductase',
-#                       
-#                       'Glyceraldehyde-3-phosphate dehydrogenase',
-#                       'Tubulin beta chain',
-#                       'Fructose-bisphosphate aldolase',
-#                       
-#                       'Chloroquine resistance transporter'
-# )
+comp_busco_genes <- c('Secreted ookinete protein, putative',
+                      'Secreted ookinete adhesive protein, putative',
+                      '25 kDa ookinete surface antigen, putative',
+                      '28 kDa ookinete surface protein',
+                      'Cell traversal protein for ookinetes and sporozoites',
+                      
+                      'Male gamete fusion factor HAP2, putative',
+                      'Gamete egress and sporozoite traversal protein, putative',
+                      'Gamete release protein, putative',
+                      'Oocyst capsule protein',
+                      'Malate dehydrogenase',
+                      'Ribonucleoside-diphosphate reductase',
+                      
+                      'Glyceraldehyde-3-phosphate dehydrogenase',
+                      'Tubulin beta chain',
+                      'Fructose-bisphosphate aldolase',
+                      
+                      'Chloroquine resistance transporter'
+)
 
 # For Pvivax housekeeping gene: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4704153/
 
+# Grouping by each assembly and transcript, which transcripts have TPM and NumReads < 1 TPM in every sample.
+# #. i.e. Filter out every transcript with at least one sample with >= 1 TPM/NumReads.
+# quant_filtered.df <- group_by(quant.df,
+#                               assembly,
+#                               fasta_path,
+#                               Name) %>%
+#   filter(any(TPM >= 1 & NumReads >= 1)) %>%
+#   filter(!is.na(hmm_cvrg) & hmm_cvrg_perc >= 75 | Description.y %in% comp_busco_genes)
+# write_csv(quant_filtered.df, path = 'salmonQuant_filtered.csv')
+
 quant_filtered.df <- read.csv('salmonQuant_filtered.csv')
 
+# 'HMM Plasmodium_vir coverage for each sequence' <- na.omit(quant.df$hmm_cvrg_perc)
+# hist(`HMM Plasmodium_vir coverage for each sequence`, breaks = 1000, cex.main = 1)
+# hist(quant_filtered.df$hmm_cvrg_perc, breaks = 100)
+
+# quant_filtered.df %>% filter(TPM < 1)
+
+# How many genes/pir genes are kept for each assembly
+# ( quant_stats.df <- group_by(quant.df, assembly) %>% 
+#     summarise(prop_all = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1])/n_distinct(Name),
+#               num_pir = n_distinct(Name[!is.na(Sequence.x)]),
+#               prop_pir_tpm = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1 & !is.na(Sequence.x)])/n_distinct(Name[!is.na(Sequence.x)]),
+#               prop_pir_hmm = 100*n_distinct(Name[hmm_cvrg_perc >= 75 & !is.na(Sequence.x)])/n_distinct(Name[!is.na(Sequence.x)]),
+#               prop_pir_filt = 100*n_distinct(Name[TPM >= 1 & NumReads >= 1 & !is.na(Sequence.x) & hmm_cvrg_perc >= 75])/n_distinct(Name[!is.na(Sequence.x)]),
+#               num_pir_filt = n_distinct(Name[TPM >= 1 & NumReads >= 1 & !is.na(Sequence.x) & hmm_cvrg_perc >= 75])) %>% 
+#     arrange(prop_pir_filt) )
+# arrange(quant_stats.df, assembly)
+# mutate(quant_stats.df,expt = str_extract(assembly, pattern = '^[[:alpha:]]+[[:digit:]]{2}(?=_)')) %>% 
+#   group_by(expt) %>% summarise(num_pir_filt = sum(num_pir_filt)) %>% arrange(num_pir_filt) 
+# # %>% .$num_pir_filt %>% sum()
+# sum(quant_stats.df$num_pir_filt)
+# filter(quant_filtered.df, X..Busco.id == '3673at5820')
 ```
 
 # Histogram of HMM % coverage across the _de novo pir_\s
