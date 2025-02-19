@@ -133,7 +133,7 @@ Mosquito stages show low-to-no _de novo pir_\s even with decent BUSCO results, w
 
 Asexual stages show that better assemblies demonstrate better _de novo pir_ recoveries. There is no plateau of the _pir_ numbers, demonstrating that these assemblies are only capturing a subset of the total _pir_ transcriptome, as expected. Note that one SchzMixd22 (from Papua New Guinea) sample shows exceptional _de novo pir_ numbers (373) despite low BUSCO score.
 
-```{r assembly_stats}
+```{r fig2_assembly_stats}
 assembly.df <- unique(select(assembly_stats.df, 
                              lifecycle_stage, BUSCO_Complete, num_pir, experiment_id))
 
