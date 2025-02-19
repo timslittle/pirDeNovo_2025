@@ -188,30 +188,36 @@ _P. knowlesi_ and _coatneyi_ are the most divergent, only showing a few overlapp
 
 Interestingly by this metric the hierarchical clustering of the heatmap separates the _de novo_ sequences out with Sal1 and _P. vivax-like_. I'm not sure what to read into this, as it isn't clear why the clustering has done that. Note that the _de novo_ sequences do not include sub-family B, but _pir_\s of this ilk are indeed present in all three reference genomes. This is likely an un/lowly-expressed sub-family.
 
+```{r combine_df}
+#Combine the data frames for later figures.
+pir_assembly_stats.df <- full_join(pir.df, filter(assembly_stats.df, num_pir > 0, BUSCO_Complete >= 50) )
+```
+
+
 ```{r subfam_dis_spec, fig.show = TRUE}
 
-assigned_subfam_num.df <- assigned_subfam.df %>% 
-  mutate(species = ifelse(species == 'vvx' & !str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$') ,
-                          subfam,
-                          ifelse(species == 'vvx' & str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$'),
-                                 'vvxSal1',
-                                 species))) %>% 
+#Save the species of Plasmodium but save the vvx species as the strain, and Sal1 sequences as 'vvxSal1'
+assigned_subfam_num.df <- mutate(pir_assembly_stats.df,
+                                 species = ifelse(species == 'vvx' & !str_detect(Subfam_Sal1, 
+                                                                                 pattern = '^(B|C|D|E|F|G|H|I|J|K)$'),
+                                                  Subfam_Sal1,
+                                                  ifelse(species == 'vvx' & str_detect(Subfam_Sal1,
+                                                                                       pattern = '^(B|C|D|E|F|G|H|I|J|K)$'),
+                                                         'vvxSal1',
+                                                         species))) %>% 
   #Filter the de_novo pirs by the BUSCO scores
-  filter(is.na(Complete) | Complete >= 50) %>% 
-  group_by(species, I1.4, new_subfam_uniq) %>% 
+  filter(is.na(BUSCO_Complete) | BUSCO_Complete >= 50) %>% 
+  group_by(species, BLAST_Cluster_Num, Subfam_new) %>% 
   summarise(num_genes = n_distinct(label))
-
-# ggplot(assigned_subfam_num.df, aes(x = species, y = num_genes, fill = new_subfam_uniq)) +
-#          geom_col(position = 'fill')
 
 assigned_subfam_prop.df <- group_by(assigned_subfam_num.df, 
                                     species) %>% 
-  arrange(I1.4) %>% 
+  arrange(BLAST_Cluster_Num) %>% 
   mutate(prop_genes = num_genes/sum(num_genes))
 
 # To order the sub-families from largest to smallest in the heatmap.
-assigned_subfam_prop.df$new_subfam_uniq = factor(assigned_subfam_prop.df$new_subfam_uniq, 
-                                                 levels = unique(assigned_subfam_prop.df$new_subfam_uniq))
+assigned_subfam_prop.df$new_subfam_uniq = factor(assigned_subfam_prop.df$Subfam_new, 
+                                                 levels = unique(assigned_subfam_prop.df$Subfam_new))
 
 assigned_subfam_prop.mat <- reshape2::dcast(assigned_subfam_prop.df, 
                                             new_subfam_uniq ~ species, 
