@@ -190,7 +190,7 @@ Interestingly by this metric the hierarchical clustering of the heatmap separate
 
 ```{r combine_df}
 #Combine the data frames for later figures.
-pir_assembly_stats.df <- full_join(pir.df, filter(assembly_stats.df, num_pir > 0, BUSCO_Complete >= 50) )
+pir_assembly_stats.df <- full_join(pir.df, filter(assembly_stats.df, num_pir > 0) )
 ```
 
 
@@ -244,26 +244,12 @@ assigned_subfam_prop.mat[is.na(assigned_subfam_prop.mat)] <- 0
                     name = 'Proportion of\n pir numbers\n',
 ) )
 
-pdf("../../plots/Fig5_vvx_Subfam-Propheatmap_Species.pdf", width = 8, height = 6)
-draw(spec_ht)
-dev.off()
+# pdf("../../plots/Fig5_vvx_Subfam-Propheatmap_Species.pdf", width = 8, height = 6)
+# draw(spec_ht)
+# dev.off()
 ```
 
-```{r}
-# biplot(prcomp(t(assigned_subfam_prop.mat)))
-# biplot(prcomp(t(assigned_subfam_prop.mat), scale = TRUE))
-library('ggfortify')
-autoplot(prcomp(t(assigned_subfam_prop.mat), scale = TRUE), loadings.label = TRUE, shape = FALSE, label = TRUE)
-# 
-# pca_spec_subset <- prcomp(t(assigned_subfam_prop.mat[,
-#                                          str_detect(colnames(assigned_subfam_prop.mat),
-#                                                     pattern = 'vvx|de_novo|ovale|cyno')]))
-# summary(pca_spec_subset)
-# biplot(pca_spec_subset)
-
-```
-
-## Sub-family distributions across the **numbers** of _pir_\s from different **assemblies**.
+## SuppFig3: Sub-family distributions across the **numbers** of _pir_\s from different **assemblies**.
 
 Now I'm focussing on the individual assemblies, defined by their experiment ID (see the beginning of this doc) and an assembly ID after the underscore.
 
@@ -275,7 +261,7 @@ I think the heatmap is still mostly splitting based on the number of _pir_ sub-f
 
 Beyond that, finding patterns is tricky. Certainly looks to me like most samples, even from very different regions, tend to have transcripts for a range of the same sub-families.
 
-```{r subfam_dis_expt, show.fig = TRUE}
+```{r SuppFig3_subfam_dis_expt, show.fig = TRUE}
 assigned_subfam_num.df <- assigned_subfam.df %>% 
   filter(subfam == 'de_novo') %>% 
   filter(assembly == 'Meul22_PNG056_vvx' | Complete >= 50) %>%
@@ -348,7 +334,7 @@ country_ht <- Heatmap(country.mat,
                       column_names_gp = gpar(fontsize = 6),
                       col = c('black', 'blue', 'yellow', 'red', 'grey', 'hotpink')[1:length(unique(country.mat))])
 
-pdf("../../plots/SuppFig_vvx_Subfam-Propheatmap_orderCluster.pdf", width = 7, height = 5)
+pdf("../../plots/SuppFig3_vvx_Subfam-Propheatmap_orderCluster.pdf", width = 7, height = 5)
 draw(subfam_ht + busco_ht + country_ht)
 dev.off()
 # biplot(princomp(t(assigned_subfam_prop.mat), scale = TRUE, center = TRUE))
