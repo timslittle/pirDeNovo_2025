@@ -66,7 +66,8 @@ assembly_stats.df <- read_xlsx('../suppFiles/AdditionalFile1_samples.xlsx') %>%
          lifecycle_stage, 
          location, 
          experiment_id,
-         country) %>% 
+         country,
+         BUSCO_Complete) %>% 
   filter(!is.na(num_pir))
 ```
 
@@ -133,6 +134,49 @@ Mosquito stages show low-to-no _de novo pir_\s even with decent BUSCO results, w
 Asexual stages show that better assemblies demonstrate better _de novo pir_ recoveries. There is no plateau of the _pir_ numbers, demonstrating that these assemblies are only capturing a subset of the total _pir_ transcriptome, as expected. Note that one SchzMixd22 (from Papua New Guinea) sample shows exceptional _de novo pir_ numbers (373) despite low BUSCO score.
 
 ```{r assembly_stats}
+assembly.df <- unique(select(assembly_stats.df, 
+                             lifecycle_stage, BUSCO_Complete, num_pir, experiment_id))
+
+# Keep the same axes for both graphs
+y_max <- max(assembly.df$num_pir)
+
+lapply(c('mosquito','asexual'), function(stages){
+  busco.plot <- ggplot(data = filter(assembly.df,
+                                     str_detect(lifecycle_stage, 
+                                                pattern = stages)) , 
+                       aes(x = BUSCO_Complete, 
+                           y = num_pir, 
+                           col = experiment_id,
+                           shape = lifecycle_stage)) +
+    geom_point(size = 3, stroke  = 2) +
+    scale_shape_manual(values = seq(1,10)) +
+    xlab('Percentage of complete BUSCOs') +
+    ylab('Number of pirs') +
+    theme_classic() +
+    # Minus one minimum otherwise the zero values are lost.
+    ylim(min = -1, max = y_max) +
+    xlim(min = 0, max = 100) +
+    guides(color = guide_legend(ncol = 1,
+                                title = 'Experiment ID', 
+                                byrow = TRUE,
+                                order = 1),
+           shape = guide_legend(ncol = 1, 
+                                title = 'Lifecycle stage', 
+                                byrow = TRUE)) +
+    theme(legend.text = element_text(size = 15),
+          legend.key.size = unit(.5,"cm"),
+          legend.spacing.y = unit(.25, 'cm'),
+          text = element_text(size = 17))
+  # ggsave(paste0('../plots/Fig2_vivax_BUSCOvNumPir_', stages,'.pdf'),
+  #        busco.plot,
+  #        width = unit(10, "in"),
+  #        height = unit(6, "in"))
+  busco.plot
+})
+
+```
+
+```{r}
 
 assembly.df <- unique(select(quant_filtered.df, 
                              lifecycle_stage, Complete, num_pir, experiment_id))
