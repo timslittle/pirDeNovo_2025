@@ -37,7 +37,6 @@ library('dplyr')
 library('stringr')
 library('purrr')
 library('kableExtra')
-# library('plotly')
 library('rmarkdown')
 library('seqinr')
 library('ggplot2')
@@ -62,7 +61,7 @@ source('../rfunctions/ordering_fun.R')
 experiment.vec <- c('Bourgard21', 'Imp22', 'K19', 'Meul22',
                     'R20', 'S20-Z16', 'B20-C19-G19-G18-M19-K17')
 
-#Replace the path names after 'ls' with the pathnames to the salmon quant file outputs.
+#USER: Replace the path names after 'ls' with the pathnames to the salmon quant file outputs.
 quant.files <- c(
   system("ls ../../nextflow/vvx_*/salmon/*/quant.sf", 
          intern = TRUE),
@@ -70,6 +69,8 @@ quant.files <- c(
          intern = TRUE)
 )
 
+#Get the list of the different assembly files 
+# (the folder names for the quant.sf files, as each alignment was performed against these assemblies.)
 assemblies.list <- str_extract(quant.files, pattern = '(?<=_vvx_T[[:digit:]]{1,2}_).+(?=/quant.sf)') %>% unique
 
 # Load in the quant.sf data by lapply-ing across the experiment/Nextflow analysis names above.
@@ -171,7 +172,6 @@ assemblies.list <- str_extract(quant.files, pattern = '(?<=_vvx_T[[:digit:]]{1,2
 #                        left_join(busco.df, by = 'Name')
 #                      })
 # 
-# # data.table::rbindlist(quant.list)
 # 
 # quant.df <- bind_rows(quant.list)
 # 
