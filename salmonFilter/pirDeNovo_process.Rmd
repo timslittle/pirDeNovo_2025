@@ -78,9 +78,91 @@ pir.df <- read.csv('../suppFiles/AdditionalFile3_pirClustersSubfam.csv',
 
 ```
 
-```{r }
+```{r fig3}
 
+subfam_col <- safe_colorblind_palette
+names(subfam_col) <- c('E','G','K','J','I','B','C')
 
+( 
+  subfam_graph.df <- pir.df %>% 
+    arrange(BLAST_Cluster_Num) %>% 
+    group_by(BLAST_Cluster_Num) %>% 
+    filter(BLAST_Cluster_Num < 26) %>% 
+    mutate(infl_net = factor(paste0(BLAST_Cluster_Num, 
+                             ' (n = ', n_distinct(label), ')'))) %>% 
+    filter(str_detect(Subfam_Sal1, pattern = '^(B|C|D|E|F|G|H|I|J|K)$')) %>%
+    group_by(Subfam_Sal1, species, infl_net, .drop = FALSE) %>% 
+    dplyr::summarise(number = n_distinct(label))
+)
+
+max_y <- max(summarise(group_by(subfam_graph.df, 
+                                infl_net), 
+                       sum_num = sum(number))$sum_num)
+breaks_y <- seq(0, 
+                plyr::round_any(max_y, 5, ceiling), 
+                5)
+
+( subfam_graph.plot <- ggplot(subfam_graph.df, 
+                              aes(x = infl_net, 
+                                  y = number, 
+                                  fill = Subfam_Sal1)) +
+    geom_col(position = 'stack') +
+    xlab('Cluster ID (total number of pirs in cluster)') +
+    ylab('Number of Sal1 pirs in each cluster') +
+    scale_fill_manual(values = subfam_col,
+                      name = 'Sal1 sub-family') +
+    scale_y_continuous(breaks = breaks_y,
+                       # limits = c(0, max(breaks_y))
+    ) +
+    theme_classic()+
+    theme(axis.text.x = element_text(angle = 75, vjust = 0.47)) )
+
+ggsave('../plots/Fig3_vivax_subfamDisI14Network.pdf',
+       height = 5,
+       width = 10,
+       subfam_graph.plot)
+
+```
+
+```{r}
+subfam_graph.df <- gephi_mcl.df %>% 
+  select(-c(starts_with('I')), infl) %>% 
+  arrange(across(infl)) %>% 
+  group_by(across(infl)) %>% 
+  # Restrict to top 25 clusters.
+  filter(get(infl) < 26) %>% 
+  mutate(infl_net = factor(
+    # do.call(
+    paste0(get(infl), ' (n = ', n_distinct(label), ')')
+    # , list(infl = infl, label = label)
+    # )
+  )) %>% 
+  filter(str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$')) %>%
+  # mutate(subfam = ifelse(str_detect(subfam, pattern = '^(B|C|D|E|F|G|H|I|J|K)$'),
+  #                      subfam, 
+  #                      'none')) %>% 
+  group_by(subfam, species, infl_net, .drop = FALSE) %>% 
+  dplyr::summarise(number = n_distinct(label))
+
+max_y <- max(summarise(group_by(subfam_graph.df, infl_net), sum_num = sum(number))$sum_num)
+breaks_y <- seq(0, plyr::round_any(max_y, 5, ceiling), 5)
+
+( subfam_graph.plot <- ggplot(subfam_graph.df, aes(x = infl_net, y = number, fill = subfam)) +
+    geom_col(position = 'stack') +
+    xlab('Cluster ID (total number of pirs in cluster)') +
+    ylab('Number of Sal1 pirs in each cluster') +
+    scale_fill_manual(values = subfam_col,
+                      name = 'Sal1 sub-family') +
+    scale_y_continuous(breaks = breaks_y,
+                       # limits = c(0, max(breaks_y))
+    ) +
+    theme_classic()+
+    theme(axis.text.x = element_text(angle = 75, vjust = 0.47)) )
+
+ggsave('../../plots/Fig3_vivax_subfamDisI14Network.pdf',
+       height = 5,
+       width = 10,
+       subfam_graph.plot)
 
 ```
 
