@@ -1,5 +1,5 @@
 ---
-title: "tl22-01_VvxTPMover1"
+title: "pirDeNovo_process"
 output: 
   html_document:
     theme: cosmo
@@ -37,7 +37,7 @@ library('dplyr')
 library('stringr')
 library('purrr')
 library('kableExtra')
-# library('plotly')
+library('readxl')
 library('rmarkdown')
 library('seqinr')
 library('ggplot2')
@@ -56,92 +56,34 @@ source('../rfunctions/uniquify_fun.R')
 source('../rfunctions/ordering_fun.R')
 ```
 
-```{r load_salmon_quant_files}
-# Manually altered the assembly_stats csv file to include life cycle stages and experimental identifiers.
-assembly_stats.df <- read_csv('assembly_stats_lifecycle.csv') %>%
+```{r load_assembly_info}
+assembly_stats.df <- read_xlsx('../suppFiles/AdditionalFile1_samples.xlsx') %>% 
   mutate(helpful_id = paste0(experiment_id, '_', helpful_assembly_name),
          country = str_extract(location, pattern = '(?<=_).+(?=_)')) %>%
-  select(assembly, num_pir, lifecycle_stage, location, experiment_id, helpful_assembly_name, helpful_id, country)
+  select(helpful_id,
+         helpful_assembly_name, 
+         num_pir, 
+         lifecycle_stage, 
+         location, 
+         experiment_id,
+         country) %>% 
+  filter(!is.na(num_pir))
 ```
 
-```{r quant_filtered}
-## How the quant data frame was filtered (TPM >=1 in alignment/counting to any sample,
-## and HMMer coverage >= 75% OR in the comp_busco_genes list)
-# group_by(quant.df,
-#                               assembly,
-#                               fasta_path,
-#                               Name) %>%
-#   filter(any(TPM >= 1 & NumReads >= 1)) %>%
-#   filter(!is.na(hmm_cvrg) & hmm_cvrg_perc >= 75 | Description.y %in% comp_busco_genes)
+```{r load_pir_quant}
 
-#Want to include some non-pir genes as identified by BUSCO since these are useful for comparing different life cycle stages present.
-# comp_busco_genes <- c('Secreted ookinete protein, putative',
-#                       'Secreted ookinete adhesive protein, putative',
-#                       '25 kDa ookinete surface antigen, putative',
-#                       '28 kDa ookinete surface protein',
-#                       'Cell traversal protein for ookinetes and sporozoites',
-#                       
-#                       'Male gamete fusion factor HAP2, putative',
-#                       'Gamete egress and sporozoite traversal protein, putative',
-#                       'Gamete release protein, putative',
-#                       'Oocyst capsule protein',
-#                       'Malate dehydrogenase',
-#                       'Ribonucleoside-diphosphate reductase',
-#                       
-#                       'Glyceraldehyde-3-phosphate dehydrogenase',
-#                       'Tubulin beta chain',
-#                       'Fructose-bisphosphate aldolase',
-#                       
-#                       'Chloroquine resistance transporter'
-# )
-
-# For Pvivax housekeeping gene: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4704153/
-
-quant_filtered.df <- read.csv('salmonQuant_filtered.csv')
+pir.df <- read.csv('../suppFiles/AdditionalFile3_pirClustersSubfam.csv', 
+                   row.names = 1,
+                   stringsAsFactors = FALSE)
 
 ```
 
-```{r subfam}
-# Make the node.df file for graph design. Using the concatenated fasta file of the above filtered de novo pirs and reference gene pirs.
+```{r }
 
-lopez13_sal1Subfam <- read.table('../../../tl22-02_VirSubfamNetwork/pir_info/lopez13_vir_subfam.txt', 
-                                 col.names = c('name','subfam'),
-                                 stringsAsFactors = FALSE)
-deNovo_Ref_pirs.list <- getName(read.fasta(file = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13.fasta'))
-subfam.df <- data.frame(Name = deNovo_Ref_pirs.list,
-                        subfam = case_when(grepl(deNovo_Ref_pirs.list, pattern = 'Nonam') ~ "de_novo",
-                                           grepl(deNovo_Ref_pirs.list, pattern = 'PVX') ~ "vvxSal1",
-                                           grepl(deNovo_Ref_pirs.list, pattern = 'P01') ~ "vvxP01",
-                                           grepl(deNovo_Ref_pirs.list, pattern = 'PVW1') ~ "vvxW1",
-                                           grepl(deNovo_Ref_pirs.list, pattern = 'PCYB') ~ "cynoB",
-                                           grepl(deNovo_Ref_pirs.list, pattern = 'PcyM') ~ "cynoM",
-                                           grepl(deNovo_Ref_pirs.list, pattern = 'Poc') ~ "ovale",
-                                           grepl(deNovo_Ref_pirs.list, pattern = 'PKA1') ~ "knowlA",
-                                           grepl(deNovo_Ref_pirs.list, pattern = 'PKNOH') ~ "knowlH",
-                                           grepl(deNovo_Ref_pirs.list, pattern = 'PKNH') ~ "knowlM",
-                                           grepl(deNovo_Ref_pirs.list, pattern = 'PmUG01') ~ "malar",
-                                           grepl(deNovo_Ref_pirs.list, pattern = 'PVL') ~ "vvxlike",
-                                           grepl(deNovo_Ref_pirs.list, pattern = 'PCOAH') ~ "coat",
-                                           grepl(deNovo_Ref_pirs.list, pattern = 'MKS88') ~ "brasl"),
-                        stringsAsFactors = FALSE) %>%
-  mutate(species = ifelse(subfam == 'de_novo',
-                          'vvx',
-                          str_extract(subfam, pattern = '^[[:lower:]]+'))
-  )
 
-subfam.df$subfam[grepl(subfam.df$Name, pattern = 'PVX')] <- sapply(
-  str_subset(subfam.df$Name, pattern = 'PVX'), 
-  function(sal1_id) {
-    if(sal1_id %in% lopez13_sal1Subfam$name) {
-      lopez13_sal1Subfam$subfam[which(lopez13_sal1Subfam$name %in% sal1_id)]
-    } else {
-      'vvxSal1'
-    }
-  })
 
-# write_csv(subfam.df,
-#           path = '../../network/deNovoPirs-23Apr_pirsVvxVvxOrtho_wLopez13_Sal1subfam.csv')
 ```
+
 
 ```{r gephi}
 # Preparing the data for Gephi input requires some special treatment, including making a number for each node.
