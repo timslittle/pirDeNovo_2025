@@ -243,11 +243,11 @@ transcriptCvrg.df %>% filter(sample_name == '21659_8_16',
 ```{r ancestral_gene_coverage}
 blast_forcov.df %>% 
   filter(sseqid == 'PCHAS_0101200.1-p1') %>% 
-  group_by(sample_name, assembler_name) %>% 
+  group_by(sample_name, assembler_name, cdhit_thresh) %>% 
   slice_max(scovhsp) %>% 
   mutate( max(qcovhsp), max(pident)) %>% 
   ungroup() %>% 
-  select(sample_name, assembler_name, sseqid, scovhsp, 'max(pident)', 'max(qcovhsp)' ) %>% 
+  select(sample_name, assembler_name, cdhit_thresh, sseqid, scovhsp, 'max(pident)', 'max(qcovhsp)' ) %>% 
   arrange(scovhsp)
 ```
 
@@ -316,7 +316,9 @@ transcriptCvrg_MultiEvi.df <- filter(transcriptCvrg.df,
 # Are the top expressed transcripts found by the assemblies?
 
 ```{r}
-sample_table <- read.delim('samples_lanes_rMT.list', col.names = c('sample','transmission','id') ) %>% 
+sample_table <- read.delim('samples_lanes_rMT_updated.list', 
+                           header = FALSE,
+                           col.names = c('sample','transmission','id') ) %>% 
   mutate(time = str_extract(sample, pattern = '[:digit:]{1,2}(a|p)m|sch'),
          rep = str_extract(sample, pattern = '(?<=-(|m))[[:digit:]]')) %>% 
   mutate(twentyfour = ifelse( str_detect(time, pattern = 'sch'), 
@@ -328,7 +330,9 @@ sample_table <- read.delim('samples_lanes_rMT.list', col.names = c('sample','tra
 ```
 
 ```{r}
-rmt <- read.csv('tl19-07_twentyfour_tpm_samples.csv')
+# Note that not all the files in the sample.list are in the expression data.
+rmt <- read.csv('tl19-07_twentyfour_tpm_samples.csv') %>% 
+  filter(Geneid %in% pir.info$Gene.ID)
 rmt <- rmt[,colnames(rmt) %in% c('Geneid', str_subset(colnames(rmt), pattern = 'rMT') )]
 rmt <- rmt[,!grepl(colnames(rmt), pattern = 'Unk')]
 colnames(rmt) <- unlist(lapply(str_extract_all(colnames(rmt), pattern = 'Geneid|(?<=rMT_)[[:digit:]]{2}h|_[[:digit:]]$|sch'), paste, collapse = ''))
@@ -341,10 +345,51 @@ rmt <- melt(rmt, id.vars = 'Gene.ID', variable.name = 'name', value.name = 'tpm'
 
 
 ```{r}
+# is_empty(setdiff(rmt$name, sample_table$name))
 sample_tpm <- merge(sample_table, rmt, by = 'name')
-transcripts_tpm <- merge(blast_forcov.df, sample_tpm, by = c('sample_name', 'Gene.ID') )
+#Need to merge with the blast table but keep the transcripts missed by blast.
+
+transcripts_tpm <- left_join(sample_tpm, 
+                             filter(blast_forcov.df, 
+                                    cdhit_thresh == 'No Dup'), 
+                             by = c('sample_name', 'Gene.ID') ) 
+
+
+transcripts_tpm <- data.frame(transcripts_tpm) %>% 
+  ungroup() %>% 
+  tidyr::complete(Gene.ID, 
+                  sample_name, 
+                  assembler_name,
+                  fill = list('pident' = 0,
+                              'qcovhsp' = 0,
+                              'scovhsp' = 0)) %>% 
+  group_by(Gene.ID, sample_name) %>% 
+  tidyr::fill(tpm, .direction = "downup") %>% 
+  tidyr::drop_na('assembler_name')
+
+# Should be (num pirs * num samples * num assemblers) rows
+nrow(transcripts_tpm) == 211*23*5
+
+#Missing pir that now should be present
+filter(transcripts_tpm, Gene.ID == 'PCHAS_1468400')
+
+write.csv(transcripts_tpm, file = 'chabaudiAssemblyPirBlast_TPM.csv')
+```
+```{r}
+unique(transcripts_tpm$Gene.ID)
 ```
 
+```{r}
+transcripts_tpm.plot <- transcripts_tpm %>% 
+  filter(assembler_name == 'evigene') %>% 
+  group_by(Gene.ID, sample_name) %>% 
+  summarise(tpm = tpm, pident_max = max(pident))
+
+nrow(transcripts_tpm.plot) == 211*23
+
+ggplot(data = transcripts_tpm.plot) +
+  geom_point(aes(x = tpm, y = pident_max))
+```
 
 # BUSCO scores
 
