@@ -375,20 +375,32 @@ filter(transcripts_tpm, Gene.ID == 'PCHAS_1468400')
 
 write.csv(transcripts_tpm, file = 'chabaudiAssemblyPirBlast_TPM.csv')
 ```
-```{r}
-unique(transcripts_tpm$Gene.ID)
-```
 
 ```{r}
 transcripts_tpm.plot <- transcripts_tpm %>% 
-  filter(assembler_name == 'evigene') %>% 
-  group_by(Gene.ID, sample_name) %>% 
-  summarise(tpm = tpm, pident_max = max(pident))
+  filter(assembler_name == 'evigene', 
+         # pident >= 95
+         )
 
 nrow(transcripts_tpm.plot) == 211*23
 
-ggplot(data = transcripts_tpm.plot) +
-  geom_point(aes(x = tpm, y = pident_max))
+lapply(unique(transcripts_tpm.plot$sample_name), 
+       function(id_sample){
+         ggplot(data = filter(transcripts_tpm.plot, sample_name == id_sample) ) +
+           geom_point(aes(x = tpm, y = scovhsp, color = pident)) +
+           scale_color_continuous(type = 'viridis') +
+           ggtitle(id_sample) +
+           theme_classic()
+       })
+```
+
+```{r altogether}
+scovhsp_v_tpm <- ggplot(data = transcripts_tpm.plot ) +
+  geom_point(aes(x = tpm, y = scovhsp, color = pident)) +
+  scale_color_continuous(type = 'viridis') +
+  theme_classic()
+ggsave(plot = scovhsp_v_tpm, filename = 'scovhsp_v_tpm.png')
+scovhsp_v_tpm
 ```
 
 # BUSCO scores
