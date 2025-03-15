@@ -51,7 +51,7 @@ library('plotly')
 # library('seqinr')
 library('rmarkdown')
 library('data.table')
-library('xlsx')
+# library('xlsx')
 library('ComplexHeatmap')
 library('circlize')
 library('viridis')
@@ -104,10 +104,10 @@ outfmt6_headers <-
   unlist
 
 blast_files <- c(
-  list.files(path = "../../blast", 
+  list.files(path = "../../../blast", 
              pattern = "blastp.outfmt6",
              full.names = TRUE),
-  list.files(path = "../../blast/chabaudi", 
+  list.files(path = "../../../blast/chabaudi", 
              pattern = "evigene",
              full.names = TRUE)
 )
@@ -159,10 +159,10 @@ blast <- lapply(blast_files,
                     mutate(num_genes_match =  dplyr::n_distinct(geneid))
                 }) %>% dplyr::bind_rows()
 
-# write_csv(blast,
-#           path = '../../blast/chabaudi_blastp_results.csv')
+write_csv(blast,
+          path = 'chabaudi_blastp_results.csv')
 
-blast <- read_csv('../../blast/chabaudi_blastp_results.csv')
+blast <- read_csv('../../../blast/chabaudi_blastp_results.csv')
 
 mutate(blast, sample = paste(sample_name, assembler_name, cdhit_thresh, sep = '_')) %>% 
   .$sample %>% 
@@ -226,7 +226,9 @@ transcriptCvrg.df <- lapply(c(50,75,90,95,100),
                                 mutate(threshold = threshold) 
                             }) %>% bind_rows()
 
-transcriptCvrg.df %>% filter(sample_name == '21659_8_16', !is.na(cdhit_thresh), assembler_name == 'multi')
+transcriptCvrg.df %>% filter(sample_name == '21659_8_16', 
+                             !is.na(cdhit_thresh), 
+                             assembler_name == 'multi')
 # 
 # blast_forcov.df %>% filter(sample_name == '21659_8_16',
 #                            !is.na(cdhit_thresh),
@@ -237,6 +239,23 @@ transcriptCvrg.df %>% filter(sample_name == '21659_8_16', !is.na(cdhit_thresh), 
 #                            )
   
 ```
+
+```{r ancestral_gene_coverage}
+blast_forcov.df %>% 
+  filter(sseqid == 'PCHAS_0101200.1-p1') %>% 
+  group_by(sample_name, assembler_name) %>% 
+  slice_max(scovhsp) %>% 
+  mutate( max(qcovhsp), max(pident)) %>% 
+  ungroup() %>% 
+  select(sample_name, assembler_name, sseqid, scovhsp, 'max(pident)', 'max(qcovhsp)' ) %>% 
+  arrange(scovhsp)
+```
+
+
+```{r}
+
+```
+
 
 ```{r coverage_graph}
 

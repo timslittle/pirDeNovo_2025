@@ -261,6 +261,14 @@ I think the heatmap is still mostly splitting based on the number of _pir_ sub-f
 
 Beyond that, finding patterns is tricky. Certainly looks to me like most samples, even from very different regions, tend to have transcripts for a range of the same sub-families.
 
+```{r}
+filter(pir_assembly_stats.df, Subfam_Sal1 == 'de_novo') %>% 
+  filter(assembly == 'Meul22_PNG056_vvx' | BUSCO_Complete >= 50) %>%
+  group_by(expt, helpful_id, country, assembly_id, BLAST_Cluster_Num, Subfam_new, BUSCO_Complete) %>% 
+  summarise(num_genes = n_distinct(label))
+```
+
+
 ```{r SuppFig3_subfam_dis_expt, show.fig = TRUE}
 assigned_subfam_num.df <- assigned_subfam.df %>% 
   filter(subfam == 'de_novo') %>% 
