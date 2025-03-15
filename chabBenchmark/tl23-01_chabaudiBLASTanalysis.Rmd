@@ -252,10 +252,6 @@ blast_forcov.df %>%
 ```
 
 
-```{r}
-
-```
-
 
 ```{r coverage_graph}
 
@@ -316,6 +312,39 @@ transcriptCvrg_MultiEvi.df <- filter(transcriptCvrg.df,
 #        plot = minscovhsp.plot)
 
 ```
+
+# Are the top expressed transcripts found by the assemblies?
+
+```{r}
+sample_table <- read.delim('samples_lanes_rMT.list', col.names = c('sample','transmission','id') ) %>% 
+  mutate(time = str_extract(sample, pattern = '[:digit:]{1,2}(a|p)m|sch'),
+         rep = str_extract(sample, pattern = '(?<=-(|m))[[:digit:]]')) %>% 
+  mutate(twentyfour = ifelse( str_detect(time, pattern = 'sch'), 
+                              time, 
+                              paste0(format(strptime(time, "%I%p"), format="%H"), 'h') ) ) %>% 
+  mutate(name = paste0(twentyfour,'_',rep),
+         sample_name = str_replace(id, pattern = '#', replacement = '_')) %>% 
+  select(sample, id, name, sample_name)
+```
+
+```{r}
+rmt <- read.csv('tl19-07_twentyfour_tpm_samples.csv')
+rmt <- rmt[,colnames(rmt) %in% c('Geneid', str_subset(colnames(rmt), pattern = 'rMT') )]
+rmt <- rmt[,!grepl(colnames(rmt), pattern = 'Unk')]
+colnames(rmt) <- unlist(lapply(str_extract_all(colnames(rmt), pattern = 'Geneid|(?<=rMT_)[[:digit:]]{2}h|_[[:digit:]]$|sch'), paste, collapse = ''))
+```
+
+```{r}
+rmt <- rename(rmt, 'Gene.ID' = 'Geneid') 
+rmt <- melt(rmt, id.vars = 'Gene.ID', variable.name = 'name', value.name = 'tpm') 
+```
+
+
+```{r}
+sample_tpm <- merge(sample_table, rmt, by = 'name')
+transcripts_tpm <- merge(blast_forcov.df, sample_tpm, by = c('sample_name', 'Gene.ID') )
+```
+
 
 # BUSCO scores
 
