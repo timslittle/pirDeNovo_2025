@@ -123,6 +123,7 @@ assemblies.list <- str_extract(quant.files, pattern = '(?<=_vvx_T[[:digit:]]{1,2
 #                                                         pattern = 'Kim19_Isolate',
 #                                                         replacement = 'Kim19_Isolate_')
 # 
+#                     #If the 'busco_assembly_name' is present, import that. Otherwise use assembly.nam.
 #                      if(length(system(paste0("ls ../../nextflow/multiassembly_evigene_results/*/busco/*/",
 #                                              busco_assembly_name,
 #                                              '.okay.aa/run_plasmodium_odb10/full_table.tsv'), intern = TRUE)) > 0) {
@@ -137,7 +138,8 @@ assemblies.list <- str_extract(quant.files, pattern = '(?<=_vvx_T[[:digit:]]{1,2
 #                                                           "*/",
 #                                                           assembly.nam,
 #                                                           ".okay.aa/run_plasmodium_odb10/full_table.tsv"),
-#                                                    intern = TRUE), skip = 2)
+#                                                    intern = TRUE), 
+#                                             skip = 2)
 #                      }
 # 
 #                      busco.df <- mutate(busco.df, Name = Sequence) %>%
