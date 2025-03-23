@@ -75,107 +75,107 @@ assemblies.list <- str_extract(quant.files, pattern = '(?<=_vvx_T[[:digit:]]{1,2
 
 # Load in the quant.sf data by lapply-ing across the experiment/Nextflow analysis names above.
 # 
-# quant.list <- lapply(assemblies.list,
-#                    function(assembly.nam){
-#                      print(paste0("Doing ", assembly.nam))
-# 
-#                      # Mistake: Some results files from earlier pipeline outputs helpfully don't follow the same nomenclature:
-#                      # e.g. Kim17_SRX5158495_SRR8347532_vvx.txt.gz (old) Kim17_SRX5158495-SRR8347532_vvx.txt.gz (new) - note the '_' and '-'.
-#                      # pattern = '(SRX|ERX).+_(SRR|ERR).+(?=_vvx)'
-# 
-#                      # Which folder are the non-Salmon results in?
-# 
-#                      # tryCatch(system2(paste0("ls ../../nextflow/vvx_*/hmmer/", assembly.nam, ".txt.gz")),
-#                      #          error = function(err) {
-#                      #            system(paste0("ls ../../nextflow/*/vvx_*/hmmer/", assembly.nam, ".txt.gz"),
-#                      #                   intern = TRUE)
-#                      #          })
-# 
-#                      #Fasta file
-# 
-#                      fasta.path <- system(paste0("ls ../../nextflow/vvx_*/evigene/okayset/", assembly.nam, ".okay.aa"),
-#                             intern = TRUE)
-# 
-#                      stopifnot(length(fasta.path) == 1)
-# 
-#                      #HMMer results - requires a decent amount of processing - put into a function.
-#                      hmmer_gz.path <- system(paste0("ls ../../nextflow/vvx_*/hmmer/", assembly.nam, ".txt.gz"),
-#                             intern = TRUE)
-# 
-#                      stopifnot(length(hmmer_gz.path) == 1)
-# 
-#                      if(!any(grepl(readLines(hmmer_gz.path),
-#                                    pattern = 'No targets detected that satisfy reporting thresholds'))){
-#                        hmmer_gz.df <- read_HMMertxtgz(hmmer_gz.path) %>%
-#                          mutate(Name = Sequence)
-#                      } else {
-#                        #Create an empty data.frame when there are no HMMer matches
-#                        hmmer_gz.df <- setNames(data.frame(matrix(ncol = 11, nrow = 1)),
-#                                                c("E-value_fullseq", "score_fullseq", "bias_fullseq", "E-value_bestdom",
-#                                                  "score_bestdom", "bias_bestdom", "exp_numdom", "N_numdom", "Sequence",
-#                                                  "Description", "Name"))
-#                      }
-# 
-#                      #BUSCO results - once again have to take account of my silly file organisation and using different naming conventions.
-# 
-#                      busco_assembly_name <- str_replace(str_replace(assembly.nam,
-#                                                                     pattern = '-',
-#                                                                     replacement = '_'),
-#                                                         pattern = 'Kim19_Isolate',
-#                                                         replacement = 'Kim19_Isolate_')
-# 
-#                     #If the 'busco_assembly_name' is present, import that. Otherwise use assembly.nam.
-#                      if(length(system(paste0("ls ../../nextflow/multiassembly_evigene_results/*/busco/*/",
-#                                              busco_assembly_name,
-#                                              '.okay.aa/run_plasmodium_odb10/full_table.tsv'), intern = TRUE)) > 0) {
-#                        busco.df <- read_tsv(system(paste0("ls ../../nextflow/multiassembly_evigene_results/*/busco/*/",
-#                                                           busco_assembly_name,
-#                                                           '.okay.aa/run_plasmodium_odb10/full_table.tsv'),
-#                                                    intern = TRUE),
-#                                             skip = 2)
-#                      } else {
-#                        busco.df <- read_tsv(system(paste0("ls ../../nextflow/vvx_*/busco/",
-#                                                           assembly.nam,
-#                                                           "*/",
-#                                                           assembly.nam,
-#                                                           ".okay.aa/run_plasmodium_odb10/full_table.tsv"),
-#                                                    intern = TRUE), 
-#                                             skip = 2)
-#                      }
-# 
-#                      busco.df <- mutate(busco.df, Name = Sequence) %>%
-#                          mutate(across(everything(), as.character))
-# 
-#                      # Get the quant files for this assembly
-#                      assembly_quant.files <- str_subset(quant.files,
-#                                                         pattern = assembly.nam)
-# 
-#                      # For each quant file do:
-# 
-#                      lapply(assembly_quant.files, function(qnt){
-#                        # Get the samples mapped in these quant files
-# 
-#                        sample.nam <- str_extract(qnt,
-#                                                  pattern = '(?<=(salmon|quant)/).+_vvx_T[[:digit:]]{1,2}(?=_.+/quant.sf)')
-# 
-#                        #Read in the qnt file and add information, including whether the transcripts is a hmmer match.
-#                        read.delim(qnt) %>%
-#                          mutate(source = str_extract(qnt, '(?<=/(salmon|quant)/).+(?=/quant.sf)'),
-#                                 sample =  sample.nam,
-#                                 assembly = assembly.nam,
-#                                 file_source = qnt,
-#                                 # results_path = results.path,
-#                                 hmmer_path = hmmer_gz.path,
-#                                 fasta_path = fasta.path)
-#                      }) %>%
-#                        bind_rows %>%
-#                        # Combine with the HMMer and BUSCO
-#                        left_join(hmmer_gz.df, by = 'Name') %>%
-#                        left_join(busco.df, by = 'Name')
-#                      })
-# 
-# 
-# quant.df <- bind_rows(quant.list)
+quant.list <- lapply(assemblies.list,
+                     function(assembly.nam){
+                       print(paste0("Doing ", assembly.nam))
+                       
+                       # Mistake: Some results files from earlier pipeline outputs helpfully don't follow the same nomenclature:
+                       # e.g. Kim17_SRX5158495_SRR8347532_vvx.txt.gz (old) Kim17_SRX5158495-SRR8347532_vvx.txt.gz (new) - note the '_' and '-'.
+                       # pattern = '(SRX|ERX).+_(SRR|ERR).+(?=_vvx)'
+                       
+                       # Which folder are the non-Salmon results in?
+                       
+                       # tryCatch(system2(paste0("ls ../../nextflow/vvx_*/hmmer/", assembly.nam, ".txt.gz")),
+                       #          error = function(err) {
+                       #            system(paste0("ls ../../nextflow/*/vvx_*/hmmer/", assembly.nam, ".txt.gz"),
+                       #                   intern = TRUE)
+                       #          })
+                       
+                       #Fasta file
+                       
+                       fasta.path <- system(paste0("ls ../../nextflow/vvx_*/evigene/okayset/", assembly.nam, ".okay.aa"),
+                                            intern = TRUE)
+                       
+                       stopifnot(length(fasta.path) == 1)
+                       
+                       #HMMer results - requires a decent amount of processing - put into a function.
+                       hmmer_gz.path <- system(paste0("ls ../../nextflow/vvx_*/hmmer/", assembly.nam, ".txt.gz"),
+                                               intern = TRUE)
+                       
+                       stopifnot(length(hmmer_gz.path) == 1)
+                       
+                       if(!any(grepl(readLines(hmmer_gz.path),
+                                     pattern = 'No targets detected that satisfy reporting thresholds'))){
+                         hmmer_gz.df <- read_HMMertxtgz(hmmer_gz.path) %>%
+                           mutate(Name = Sequence)
+                       } else {
+                         #Create an empty data.frame when there are no HMMer matches
+                         hmmer_gz.df <- setNames(data.frame(matrix(ncol = 11, nrow = 1)),
+                                                 c("E-value_fullseq", "score_fullseq", "bias_fullseq", "E-value_bestdom",
+                                                   "score_bestdom", "bias_bestdom", "exp_numdom", "N_numdom", "Sequence",
+                                                   "Description", "Name"))
+                       }
+                       
+                       #BUSCO results - once again have to take account of my silly file organisation and using different naming conventions.
+                       
+                       busco_assembly_name <- str_replace(str_replace(assembly.nam,
+                                                                      pattern = '-',
+                                                                      replacement = '_'),
+                                                          pattern = 'Kim19_Isolate',
+                                                          replacement = 'Kim19_Isolate_')
+                       
+                       #If the 'busco_assembly_name' is present, import that. Otherwise use assembly.nam.
+                       if(length(system(paste0("ls ../../nextflow/multiassembly_evigene_results/*/busco/*/",
+                                               busco_assembly_name,
+                                               '.okay.aa/run_plasmodium_odb10/full_table.tsv'), intern = TRUE)) > 0) {
+                         busco.df <- read_tsv(system(paste0("ls ../../nextflow/multiassembly_evigene_results/*/busco/*/",
+                                                            busco_assembly_name,
+                                                            '.okay.aa/run_plasmodium_odb10/full_table.tsv'),
+                                                     intern = TRUE),
+                                              skip = 2)
+                       } else {
+                         busco.df <- read_tsv(system(paste0("ls ../../nextflow/vvx_*/busco/",
+                                                            assembly.nam,
+                                                            "*/",
+                                                            assembly.nam,
+                                                            ".okay.aa/run_plasmodium_odb10/full_table.tsv"),
+                                                     intern = TRUE),
+                                              skip = 2)
+                       }
+                       
+                       busco.df <- mutate(busco.df, Name = Sequence) %>%
+                         mutate(across(everything(), as.character))
+                       
+                       # Get the quant files for this assembly
+                       assembly_quant.files <- str_subset(quant.files,
+                                                          pattern = assembly.nam)
+                       
+                       # For each quant file do:
+                       
+                       lapply(assembly_quant.files, function(qnt){
+                         # Get the samples mapped in these quant files
+                         
+                         sample.nam <- str_extract(qnt,
+                                                   pattern = '(?<=(salmon|quant)/).+_vvx_T[[:digit:]]{1,2}(?=_.+/quant.sf)')
+                         
+                         #Read in the qnt file and add information, including whether the transcripts is a hmmer match.
+                         read.delim(qnt) %>%
+                           mutate(source = str_extract(qnt, '(?<=/(salmon|quant)/).+(?=/quant.sf)'),
+                                  sample =  sample.nam,
+                                  assembly = assembly.nam,
+                                  file_source = qnt,
+                                  # results_path = results.path,
+                                  hmmer_path = hmmer_gz.path,
+                                  fasta_path = fasta.path)
+                       }) %>%
+                         bind_rows %>%
+                         # Combine with the HMMer and BUSCO
+                         left_join(hmmer_gz.df, by = 'Name') %>%
+                         left_join(busco.df, by = 'Name')
+                     })
+
+
+quant.df <- bind_rows(quant.list)
 # 
 # quant.df <- mutate(quant.df, hmm_cvrg_perc = (hmm_cvrg/380)*100) %>%
 #   group_by(assembly,fasta_path) %>%
