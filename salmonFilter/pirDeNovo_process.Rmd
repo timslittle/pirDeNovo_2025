@@ -168,10 +168,10 @@ lapply(c('mosquito','asexual'), function(stages){
           legend.key.size = unit(.5,"cm"),
           legend.spacing.y = unit(.25, 'cm'),
           text = element_text(size = 17))
-  # ggsave(paste0('../plots/Fig2_vivax_BUSCOvNumPir_', stages,'.pdf'),
-  #        busco.plot,
-  #        width = unit(10, "in"),
-  #        height = unit(6, "in"))
+  ggsave(paste0('../plots/Fig2_vivax_BUSCOvNumPir_', stages,'.pdf'),
+         busco.plot,
+         width = unit(10, "in"),
+         height = unit(6, "in"))
   busco.plot
 })
 
