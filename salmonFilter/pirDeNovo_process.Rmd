@@ -147,6 +147,7 @@ lapply(c('mosquito','asexual'), function(stages){
                        aes(x = BUSCO_Complete, 
                            y = num_pir, 
                            col = experiment_id,
+                           linetype = experiment_id,
                            shape = lifecycle_stage)) +
     geom_point(size = 3, stroke  = 2) +
     scale_shape_manual(values = seq(1,10)) +
@@ -156,6 +157,7 @@ lapply(c('mosquito','asexual'), function(stages){
     # Minus one minimum otherwise the zero values are lost.
     ylim(min = -1, max = y_max) +
     xlim(min = 0, max = 100) +
+    scale_color_manual(values = rev(safe_colorblind_palette)) +
     guides(color = guide_legend(ncol = 1,
                                 title = 'Experiment ID', 
                                 byrow = TRUE,
