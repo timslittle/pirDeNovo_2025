@@ -104,10 +104,10 @@ outfmt6_headers <-
   unlist
 
 blast_files <- c(
-  list.files(path = "../../../blast", 
+  list.files(path = "../../blast", 
              pattern = "blastp.outfmt6",
              full.names = TRUE),
-  list.files(path = "../../../blast/chabaudi", 
+  list.files(path = "../../blast/chabaudi", 
              pattern = "evigene",
              full.names = TRUE)
 )
@@ -162,7 +162,7 @@ blast <- lapply(blast_files,
 write_csv(blast,
           path = 'chabaudi_blastp_results.csv')
 
-blast <- read_csv('../../../blast/chabaudi_blastp_results.csv')
+blast <- read_csv('./chabaudi_blastp_results.csv')
 
 mutate(blast, sample = paste(sample_name, assembler_name, cdhit_thresh, sep = '_')) %>% 
   .$sample %>% 
