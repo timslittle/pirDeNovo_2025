@@ -340,7 +340,7 @@ colnames(rmt) <- unlist(lapply(str_extract_all(colnames(rmt), pattern = 'Geneid|
 
 ```{r}
 rmt <- rename(rmt, 'Gene.ID' = 'Geneid') 
-rmt <- melt(rmt, id.vars = 'Gene.ID', variable.name = 'name', value.name = 'tpm') 
+rmt <- reshape2::melt(rmt, id.vars = 'Gene.ID', variable.name = 'name', value.name = 'tpm') 
 ```
 
 
