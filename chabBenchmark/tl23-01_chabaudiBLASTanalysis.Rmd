@@ -333,6 +333,8 @@ sample_table <- read.delim('samples_lanes_rMT_updated.list',
 # Note that not all the files in the sample.list are in the expression data.
 rmt <- read.csv('tl19-07_twentyfour_tpm_samples.csv') %>% 
   filter(Geneid %in% pir.info$Gene.ID)
+#Re-save Geneid as a factor to remove non-pir genes from the levels.
+rmt$Geneid <- factor(rmt$Geneid, levels = unique(rmt$Geneid))
 rmt <- rmt[,colnames(rmt) %in% c('Geneid', str_subset(colnames(rmt), pattern = 'rMT') )]
 rmt <- rmt[,!grepl(colnames(rmt), pattern = 'Unk')]
 colnames(rmt) <- unlist(lapply(str_extract_all(colnames(rmt), pattern = 'Geneid|(?<=rMT_)[[:digit:]]{2}h|_[[:digit:]]$|sch'), paste, collapse = ''))
@@ -399,7 +401,7 @@ scovhsp_v_tpm <- ggplot(data = transcripts_tpm.plot ) +
   geom_point(aes(x = tpm, y = scovhsp, color = pident)) +
   scale_color_continuous(type = 'viridis') +
   theme_classic()
-ggsave(plot = scovhsp_v_tpm, filename = 'scovhsp_v_tpm.png')
+# ggsave(plot = scovhsp_v_tpm, filename = 'scovhsp_v_tpm.png')
 scovhsp_v_tpm
 ```
 
