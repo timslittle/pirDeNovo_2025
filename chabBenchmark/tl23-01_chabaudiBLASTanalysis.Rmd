@@ -666,9 +666,9 @@ filter(transcriptCvrg_numPoss.df, threshold == 95) %>%
     ylab('Percentage of known transcripts that are transcribed') +
     facet_grid(~ threshold + cdhit_thresh, scales = 'free_x'))
 
-# ggsave(filename = '../../plots/chabaudi_numTranscribedPerAssembByCvrg.pdf',
-#        plot = gtrans_plot,
-#        height = 4)
+ggsave(filename = '../../plots/chabaudi_numTranscribedPerAssembByCvrg.pdf',
+       plot = gtrans_plot,
+       height = 4)
 ```
 
 ```{r subfam}
