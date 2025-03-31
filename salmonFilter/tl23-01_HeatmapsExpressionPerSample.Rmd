@@ -222,23 +222,24 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id),
                   
                   if(grepl(pattern = "Mosq", expt.id)){
                     ortho.ht <- Heatmap(
-                      # tpm_ortho.mat, 
-                      log1p(tpm_ortho.mat),
+                      tpm_ortho.mat,
+                      # log1p(tpm_ortho.mat),
                       cluster_rows = FALSE, 
                       cluster_columns = FALSE,
-                      # row_title_gp = gpar(fontsize = ifelse(length(unique(subfam.mat)) > 9,
-                      #                                       8,
-                      #                                       12)),
+                      row_title_gp = gpar(fontsize = ifelse(length(unique(subfam.mat)) > 9,
+                                                            11,
+                                                            15)),
                       row_title_rot = 0,
                       row_names_gp = gpar(fontsize = 8),
                       show_row_names = TRUE,
                       column_names_gp = gpar(fontsize = 12),
                       column_names_rot = 45,
-                      name = 'TPM orthologues',
+                      name = 'TPM ortho',
                       column_title = assm.id,
                       row_gap = unit(2, "mm"),
+                      row_title = 'Ortho',
                       border = TRUE,
-                      col = viridis::plasma(100),
+                      col = c('white', viridis::plasma(10)),
                       height = unit(.5,"inch")
                     )
                     
