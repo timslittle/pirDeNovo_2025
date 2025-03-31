@@ -468,7 +468,7 @@ busco.files <- c(
     theme(axis.text.x = element_blank(),
           axis.title.y = element_text(size = 8)) +
     scale_color_manual(guide = "legend", values = assembly.col, name = 'Assembly') +
-    scale_linetype_manual(values = assembly.line) +
+    scale_linetype_manual(values = assembly.line, name = 'Assembly') +
     xlab('Method of transcriptome assembly/meta-assembly') +
     ylab('Number of Complete Plasmodiium BUSCOs found') +
     facet_grid(~ cdhit_thresh, scales = 'free_x'))
