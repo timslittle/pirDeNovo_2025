@@ -151,29 +151,44 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id),
                   
                   # reshape2::dcast(assm.df, label + new_subfam_uniq + TPM_med ~ sample + helpful_sample_name, value.var = 'TPM') 
                   tpm.df <- reshape2::dcast(assm.df, 
-                                            Name + label + new_subfam_uniq + TPM_med + id99_ref + Description.y ~ helpful_sample_name, 
+                                            Name + label + new_subfam_uniq + TPM_med + id99_ref + Description.y + Score ~ helpful_sample_name, 
                                             value.var = 'TPM') %>% 
                     arrange(desc(TPM_med)) %>% 
                     #Use factors here to order by the largest TPM_median sub-families.
                     # Here is also when the rownames are defined for the heatmap.
+                    # We change the ook/ooc orthologue names to make them smaller.
                     mutate(new_subfam_uniq = factor(new_subfam_uniq, levels = unique(new_subfam_uniq)),
                            rownames = case_when(label %in% ancestral_genes_denovo ~ 'anc',
                                                 # str_detect(id99_ref, 
                                                 #            pattern = 'P') ~ str_replace_all(id99_ref,
                                                 #                                             pattern = ',',
                                                 #                                             replacement = ', '),
+                                                Description.y == "Secreted ookinete adhesive protein, putative" ~ "SOAP",
+                                                Description.y == "25 kDa ookinete surface antigen, putative" ~ "P25",
+                                                Description.y == "28 kDa ookinete surface protein" ~ "P28",
+                                                Description.y == "Secreted ookinete protein, putative" ~ "PSOP1",
+                                                Description.y == "Cell traversal protein for ookinetes and sporozoites" ~ "CelTOS",
+                                                Description.y == "Male gamete fusion factor HAP2, putative" ~ "HAP2",
+                                                
                                                 !is.na(Description.y) ~ Description.y)) %>% 
-                    arrange(new_subfam_uniq, desc(TPM_med))
+                    arrange(new_subfam_uniq, desc(TPM_med)) %>% 
+                    group_by(Description.y) %>% #Keep only the highest BUSCO scoring transcript for each orthologue.
+                    filter(Score == max(Score) | new_subfam_uniq != 'ref') %>% 
+                    ungroup()
                   
+                  #Get index to remove non-pir rows.
                   tpm_pir.index <- tpm.df$new_subfam_uniq != 'ref'
                   
                   tpm.mat <- as.matrix(select(tpm.df, -Name, -new_subfam_uniq, 
                                               -TPM_med, -id99_ref, -rownames, 
-                                              -label, -Description.y))
+                                              -label, -Description.y, -Score))
+                  #Change NAs in rownames (non-ancestral pirs) to blank.
                   rownames(tpm.mat) <- ifelse(is.na(tpm.df$rownames), '', tpm.df$rownames)
                   tpm.mat <- tpm.mat[,ordering(colnames(tpm.mat), order_vector = ordering_vector), drop = FALSE]
                   
+                  #Split into the pir and orthologue matrices for the Heatmaps
                   tpm_pir.mat <- tpm.mat[tpm_pir.index,]
+                  tpm_ortho.mat <- tpm.mat[!tpm_pir.index,]
                   
                   subfam.mat <- as.matrix(select(tpm.df, new_subfam_uniq))[tpm_pir.index,]
                   
@@ -205,13 +220,40 @@ lapply(unique(quant_subfam_buscoFifty.df$experiment_id),
                                                                  viridis::viridis(5)[2:5]))
                   )
                   
+                  if(grepl(pattern = "Mosq", expt.id)){
+                    ortho.ht <- Heatmap(
+                      # tpm_ortho.mat, 
+                      log1p(tpm_ortho.mat),
+                      cluster_rows = FALSE, 
+                      cluster_columns = FALSE,
+                      # row_title_gp = gpar(fontsize = ifelse(length(unique(subfam.mat)) > 9,
+                      #                                       8,
+                      #                                       12)),
+                      row_title_rot = 0,
+                      row_names_gp = gpar(fontsize = 8),
+                      show_row_names = TRUE,
+                      column_names_gp = gpar(fontsize = 12),
+                      column_names_rot = 45,
+                      name = 'TPM orthologues',
+                      column_title = assm.id,
+                      row_gap = unit(2, "mm"),
+                      border = TRUE,
+                      col = viridis::plasma(100),
+                      height = unit(.5,"inch")
+                    )
+                    
+                    final.ht <- pir.ht %v% ortho.ht
+                  } else {
+                    final.ht <- pir.ht
+                  }
+                  
                   if(global_save_var){
-                    pdf(paste0('../../plots/Figs_vvx_TPMheatmap_', expt.id, '_', assm.id, '.pdf'),
+                    pdf(paste0('../plots/Figs_vvx_TPMheatmap_', expt.id, '_', assm.id, '.pdf'),
                         width = 7, height = 4)
                   }
-                  draw(pir.ht)
+                  draw(final.ht)
                   if(global_save_var){dev.off()}
-                  return(pir.ht)
+                  return(final.ht)
                 })
        })
 ```
