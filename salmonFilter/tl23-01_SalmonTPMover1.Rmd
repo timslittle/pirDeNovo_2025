@@ -213,9 +213,22 @@ assembly_stats.df <- read_csv('assembly_stats_lifecycle.csv') %>%
 
 ```{r SuppFile_allQuant}
 quant.df <- read.csv(file = 'salmonQuant_all.csv')
-select(quant.df,Name, Length.x, TPM, NumReads, sample, E.value_fullseq, Description.y, expt, 
-       location, experiment_id, 
-       helpful_assembly_name, helpful_id, country)
+
+sample_helpful_names.df <- read.csv('sample_helpfulNames.csv') %>% 
+  select(id, Experiment, helpful_sample_name, samplename, )
+
+quant_small.df <- select(quant.df, Name, Length.x, TPM, NumReads, sample, E.value_fullseq, Description.y, expt, 
+                         location, experiment_id, 
+                         helpful_assembly_name, helpful_id, country)
+
+quant_helpful.df <- merge(sample_helpful_names.df, quant_small.df) %>% 
+  select(sample, id, Experiment, helpful_sample_name, Name, 
+         Length.x, TPM, NumReads, E.value_fullseq, Description.y, expt, 
+         location, experiment_id, 
+         helpful_assembly_name, helpful_id, country)
+
+quant_helpful.df %>% mutate(sample_name = paste0(helpful_id, '_', helpful_sample_name)) %>% tail()
+
 ```
 
 
