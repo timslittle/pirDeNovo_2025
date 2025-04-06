@@ -211,6 +211,14 @@ assembly_stats.df <- read_csv('assembly_stats_lifecycle.csv') %>%
 
 ```
 
+```{r SuppFile_allQuant}
+quant.df <- read.csv(file = 'salmonQuant_all.csv')
+select(quant.df,Name, Length.x, TPM, NumReads, sample, E.value_fullseq, Description.y, expt, 
+       location, experiment_id, 
+       helpful_assembly_name, helpful_id, country)
+```
+
+
 ```{r assembly_stats}
 
 #QC: Which sample names are NA:

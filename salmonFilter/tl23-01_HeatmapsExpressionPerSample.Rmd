@@ -76,6 +76,8 @@ sample_helpful_names.df <- inner_join(samples.df,sample_names.df,by = 'id') %>%
   group_by(samplename) %>% 
   mutate(helpful_sample_name = uniquify(helpful_sample_name))
 
+write.csv(sample_helpful_names.df, 'sample_helpfulNames.csv')
+
 ```
 
 These are still pretty messy, and I have yet to add informative sample names (the columns of the heatmap). Maybe the bar charts (that I did last time) would look better for this purpose? Or additional?
