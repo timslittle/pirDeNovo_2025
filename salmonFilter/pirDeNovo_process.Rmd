@@ -250,7 +250,7 @@ assigned_subfam_prop.mat[is.na(assigned_subfam_prop.mat)] <- 0
 # dev.off()
 ```
 
-## SuppFig3: Sub-family distributions across the **numbers** of _pir_\s from different **assemblies**.
+## SuppFig4: Sub-family distributions across the **numbers** of _pir_\s from different **assemblies**.
 
 Now I'm focussing on the individual assemblies, defined by their experiment ID (see the beginning of this doc) and an assembly ID after the underscore.
 
@@ -270,7 +270,7 @@ filter(pir_assembly_stats.df, Subfam_Sal1 == 'de_novo') %>%
 ```
 
 
-```{r SuppFig3_subfam_dis_expt, show.fig = TRUE}
+```{r SuppFig4_subfam_dis_expt, show.fig = TRUE}
 assigned_subfam_num.df <- assigned_subfam.df %>% 
   filter(subfam == 'de_novo') %>% 
   filter(assembly == 'Meul22_PNG056_vvx' | Complete >= 50) %>%
@@ -343,7 +343,7 @@ country_ht <- Heatmap(country.mat,
                       column_names_gp = gpar(fontsize = 6),
                       col = c('black', 'blue', 'yellow', 'red', 'grey', 'hotpink')[1:length(unique(country.mat))])
 
-pdf("../../plots/SuppFig3_vvx_Subfam-Propheatmap_orderCluster.pdf", width = 7, height = 5)
+pdf("../../plots/SuppFig4_vvx_Subfam-Propheatmap_orderCluster.pdf", width = 7, height = 5)
 draw(subfam_ht + busco_ht + country_ht)
 dev.off()
 # biplot(princomp(t(assigned_subfam_prop.mat), scale = TRUE, center = TRUE))
